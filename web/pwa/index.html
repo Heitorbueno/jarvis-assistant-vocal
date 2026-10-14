@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#09121e">
+  <meta name="description" content="Painel pessoal do Jarvis, acessível pela sua rede privada.">
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="icon" href="/pwa/icon.svg" type="image/svg+xml">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="stylesheet" href="/pwa/app.css">
+  <title>Jarvis · Assistente pessoal</title>
+  <script src="/pwa/app.js" defer></script>
+</head>
+<body>
+  <div class="ambient" aria-hidden="true"></div>
+  <div class="shell">
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="Jarvis, página inicial">
+        <img src="/pwa/icon.svg" alt="" width="42" height="42">
+        <span><strong>JARVIS</strong><small>ASSISTENTE PESSOAL</small></span>
+      </a>
+      <span class="private"><span class="private-dot"></span> AMBIENTE PRIVADO</span>
+    </header>
+    <main>
+      <section class="hero" aria-labelledby="titulo">
+        <div class="orb-box" aria-hidden="true">
+          <div class="orb-outer"><div class="orb-mid"><div class="orb-inner"></div></div></div>
+          <div class="orb-glow"></div>
+        </div>
+        <div class="intro">
+          <span class="eyebrow">PAINEL DE CONTROLE · VERSÃO INICIAL</span>
+          <h1 id="titulo">Seu Jarvis.<br><em>Sempre por perto.</em></h1>
+          <p>O núcleo do assistente está instalado no seu servidor. Esta primeira versão do PWA permite acompanhar a conexão. O chat e a interação por voz serão integrados em etapas posteriores.</p>
+          <div class="status" role="status" aria-live="polite">
+            <span class="status-bullet" id="status-bullet"></span>
+            <span id="api-status">Verificando conexão com o Jarvis…</span>
+          </div>
+          <button id="refresh" type="button" class="refresh">Verificar novamente <span aria-hidden="true">↗</span></button>
+        </div>
+      </section>
+      <section class="modules" aria-labelledby="modulos">
+        <div class="section-heading"><h2 id="modulos">Próximas integrações</h2><span>ROTEIRO DO PWA</span></div>
+        <div class="cards">
+          <article class="card"><span class="number">01</span><span class="symbol" aria-hidden="true">▤</span><h3>Chat com IA</h3><p>Conversa por texto com autenticação e permissões do Jarvis.</p><span class="pending">EM DESENVOLVIMENTO</span></article>
+          <article class="card"><span class="number">02</span><span class="symbol" aria-hidden="true">◉</span><h3>Comando de voz</h3><p>Microfone do celular ou computador, com áudio transmitido de forma segura.</p><span class="pending">EM DESENVOLVIMENTO</span></article>
+          <article class="card"><span class="number">03</span><span class="symbol" aria-hidden="true">♫</span><h3>Resposta falada</h3><p>Reprodução das respostas em português brasileiro no dispositivo.</p><span class="pending">EM DESENVOLVIMENTO</span></article>
+        </div>
+      </section>
+      <section class="hint" aria-label="Instalação">
+        <span aria-hidden="true">⌁</span>
+        <p><strong>Instale no seu dispositivo</strong><br>No menu do navegador, escolha “Instalar aplicativo” ou “Adicionar à tela de início”, quando essa opção estiver disponível.</p>
+      </section>
+    </main>
+    <footer><span>JARVIS · ACESSO PESSOAL</span><span>Servidor privado · Sem exposição pública configurada pelo PWA</span></footer>
+  </div>
+</body>
+</html>

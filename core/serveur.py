@@ -46,6 +46,8 @@ def app():
         _APP = FastAPI(title="Jarvis", docs_url=None, redoc_url=None, openapi_url=None)
         from core.pont_iphone import monter_routes
         monter_routes(_APP)                       # /api/inbox, /api/ping
+        from core.pwa import monter_routes as monter_pwa
+        monter_pwa(_APP)                         # / + PWA (somente arquivos publicos)
         try:
             from core.panneau import monter_routes as monter_panneau
             monter_panneau(_APP)                  # /panneau + /api/panneau/* (LOCAL uniquement)
