@@ -208,7 +208,10 @@ def monter_routes(app):
     from fastapi.responses import HTMLResponse, JSONResponse
 
     def garde(request: Request):
-        if not _local_seulement(request):
+        # Local, ou session distante authentifiee SI acces_distant.cockpit est active
+        # (donnees financieres : opt-in separe, desactive par defaut).
+        from core.panneau import _mode
+        if not _mode(request, "cockpit"):
             return JSONResponse({"ok": False, "message": "Cockpit local uniquement."},
                                 status_code=403)
         return None
@@ -220,8 +223,10 @@ def monter_routes(app):
             return refus
         if not _HTML.exists():
             return HTMLResponse("<h1>Cockpit</h1><p>web/cockpit.html manquant.</p>", 500)
-        return HTMLResponse(_HTML.read_text(encoding="utf-8"),
-                            headers={"X-Frame-Options": "DENY"})
+        from core.pwa import injecter
+        return HTMLResponse(injecter(_HTML.read_text(encoding="utf-8")),
+                            headers={"X-Frame-Options": "DENY", "Cache-Control": "no-store",
+                                     "Referrer-Policy": "no-referrer"})
 
     @app.get("/api/cockpit/finances")
     def api_finances(request: Request):
@@ -235,4 +240,4 @@ def monter_routes(app):
         return {"vue": tx.vue_mois(mois or None),
                 "recurrents": tx.abonnements_recurrents()}
 
-    LOG.info("cockpit monte : /cockpit (local uniquement)")
+    LOG.info("cockpit monte : /cockpit (local ; distant si acces_distant.cockpit)")

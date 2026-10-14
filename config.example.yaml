@@ -36,6 +36,15 @@ ollama:                        # mode local : modele de langage local (http://lo
   think: false                 # false = pas de "raisonnement" natif : indispensable pour la latence et les
                                # appels d'outils (sinon tres lent / rendus en texte). Laisse false.
 
+# Fournisseurs optionnels (cle + modele saisis dans le panneau, onglet « Provedores IA »).
+# Stockes pour les connecteurs ; le cerveau de Jarvis reste OpenAI, Anthropic ou Ollama.
+gemini:     { cle: "", modele: "" }
+openrouter: { cle: "", modele: "" }
+groq:       { cle: "", modele: "" }
+deepseek:   { cle: "", modele: "" }
+mistral:    { cle: "", modele: "" }
+xai:        { cle: "", modele: "" }
+
 voix_locale: piper             # mode local : "piper" (recommande FR) ou "kokoro"
 
 piper:                         # mode local : voix francaise Piper (voir docs/local.md)
@@ -188,6 +197,16 @@ serveur:                       # UN serveur web pour TOUT (pont iPhone + webhook
   ngrok_domaine: ""            # ton domaine statique SANS https:// (ex. mon-truc.ngrok-free.app) ; vide = URL aleatoire
   # B) Tu lances ngrok toi-meme (CLI) : renseigne public_url et laisse authtoken/domaine vides
   public_url: ""               # ex. "https://mon-truc.ngrok.app"
+
+acces_distant:                 # panneau/PWA a distance (Tailscale Serve, Cloudflare Tunnel, proxy HTTPS)
+  actif: false                 # false = panneau strictement local (defaut). Se regle dans le panneau LOCAL,
+                               # onglet « Acesso remoto » (voir docs/acces_distant.md)
+  hotes: []                    # noms d'hote HTTPS autorises, ex. ["jarvis-pc.tailXXXX.ts.net"]
+  reseaux: []                  # CIDR en plus du loopback, seulement si serveur.host n'est pas 127.0.0.1
+  cockpit: false               # true = /cockpit (finances) aussi accessible a distance
+  duree_session_jours: 30
+  code_hash: ""                # ecrit par le panneau (PBKDF2) : ne pas remplir a la main
+  secret: ""                   # ecrit par le panneau (signature des sessions)
 
 pont_iphone:                   # notes/commandes depuis l'iPhone (Raccourcis) ; voir docs/iphone.md
   token: ""                    # SECRET : en-tete X-Jarvis-Token (genere une longue chaine aleatoire)

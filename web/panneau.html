@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Jarvis — Panneau</title>
 <style>
   :root{
@@ -61,19 +61,37 @@
   .prog>i{display:block;height:100%;width:0;background:var(--acc)}
   small.note{color:var(--dim)}
   @media(max-width:640px){td .row{flex-direction:column;align-items:flex-start}}
+  nav{overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+  nav button{white-space:nowrap;flex:0 0 auto}
+  header{padding-top:max(16px,env(safe-area-inset-top))}
+  main{padding-bottom:max(60px,env(safe-area-inset-bottom))}
+  .prov{background:var(--card2);border:1px solid var(--bord);border-radius:12px;padding:14px;margin:0 0 12px}
+  .prov h3{margin:0;font-size:15px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .prov .grid{display:grid;grid-template-columns:1fr;gap:10px;margin-top:10px}
+  .prov .lin{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  .prov input.txt{flex:1 1 220px;min-width:0}
+  .prov select.txt{flex:1 1 260px;min-width:0}
+  .codebox{font:600 20px ui-monospace,Consolas,monospace;letter-spacing:.08em;background:#0b1a12;
+    border:1px dashed #1f5a3f;color:#7ee2b0;border-radius:10px;padding:12px;text-align:center;margin-top:10px}
+  pre.cmd{background:#0b0d11;border:1px solid var(--bord);border-radius:8px;padding:10px;overflow-x:auto;margin:6px 0}
+  @media(max-width:640px){.fld .lab{min-width:100%} select.txt{min-width:0;width:100%} header h1{font-size:14px}}
 </style>
 </head>
 <body>
 <header>
   <h1>Jarvis — Panneau de configuration</h1>
-  <span class="pill local">local uniquement</span>
+  <span id="pill-mode" class="pill local">local</span>
   <span id="hdr" class="muted" style="margin-left:auto;font-size:12px"></span>
+  <button id="btn-sair" class="act ghost" style="display:none" onclick="sair()">Sair</button>
 </header>
 <nav>
   <button data-t="modeles" class="on">Modèles</button>
   <button data-t="reglages">Réglages</button>
   <button data-t="etat">État</button>
   <button data-t="perms">Permissions</button>
+  <button data-t="provedores">Provedores IA</button>
+  <button data-t="eleven">ElevenLabs</button>
+  <button data-t="remoto">Acesso remoto</button>
 </nav>
 <main>
   <section id="modeles" class="tab on">
@@ -207,11 +225,88 @@
       <table><thead><tr><th>Outil</th><th>Niveau</th><th>Exposé MCP</th><th>Confirmation</th><th>Rôle</th></tr></thead>
       <tbody id="outils"></tbody></table></div>
   </section>
+
+  <section id="provedores" class="tab">
+    <div class="card"><h2>Provedores de IA</h2>
+      <div class="muted" style="font-size:13px;margin-bottom:12px">As chaves ficam somente no <span class="mono">config.yaml</span> deste PC e
+        nunca são devolvidas ao navegador. <b>Testar conexão</b> lista os modelos da sua conta (sem custo).
+        OpenAI, Anthropic e Ollama podem ser o <b>cérebro</b> do Jarvis; os demais ficam salvos para conectores.</div>
+      <div id="prov-lista"></div>
+    </div>
+  </section>
+
+  <section id="eleven" class="tab">
+    <div class="card"><h2>ElevenLabs (voz)</h2>
+      <div class="prov">
+        <h3>Chave de API <span id="el-badge"></span></h3>
+        <div class="grid">
+          <div class="lin">
+            <input id="el-cle" class="txt" type="password" autocomplete="off" placeholder="Cole a chave da ElevenLabs">
+            <button class="act" onclick="elSalvar()">Salvar</button>
+            <button class="act ghost" onclick="elTestar(this)">Testar conexão</button>
+            <button class="act danger" onclick="elRemover()">Remover</button>
+          </div>
+          <div class="lin">
+            <input id="el-busca" class="txt" placeholder="Buscar voz…" oninput="elFiltrar()">
+            <select id="el-voz" class="txt"><option value="">— teste a conexão para listar as vozes —</option></select>
+          </div>
+          <div class="lin">
+            <select id="el-modelo" class="txt"><option value="">— modelo —</option></select>
+            <button class="act" onclick="elSelecionar(false)">Salvar voz/modelo</button>
+            <button class="act ghost" onclick="elSelecionar(true)">Salvar e usar ElevenLabs</button>
+            <button class="act ghost" onclick="testerVoix()">Ouvir teste no PC</button>
+          </div>
+          <div class="msg" id="el-msg"></div>
+          <small class="note">Link: <a href="https://elevenlabs.io/app/settings/api-keys" target="_blank" rel="noopener" style="color:var(--acc)">elevenlabs.io → API keys</a> (a chave precisa da permissão <i>Voices: read</i>).</small>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="remoto" class="tab">
+    <div class="card"><h2>Acesso remoto (Tailscale / Cloudflare / proxy HTTPS)</h2>
+      <div id="rem-bloq" class="lock" style="display:none">Esta seção só pode ser alterada no próprio PC (http://127.0.0.1:8790/panneau).</div>
+      <div id="rem-form">
+        <div class="fld"><div class="lab"><b>Status</b><small>Desativado = painel só no PC.</small></div>
+          <span id="rem-status"></span></div>
+        <div class="fld"><div class="lab"><b>Hosts autorizados</b><small>Um por linha. Ex.: jarvis-pc.tailXXXX.ts.net</small></div>
+          <textarea id="rem-hosts" class="txt" rows="3" style="flex:1 1 280px;background:var(--card2);color:var(--txt);border:1px solid var(--bord);border-radius:8px;padding:8px"></textarea></div>
+        <div class="fld"><div class="lab"><b>Redes extras (CIDR)</b><small>Opcional. Só se o servidor escutar fora do 127.0.0.1.</small></div>
+          <input id="rem-redes" class="txt" placeholder="ex.: 100.64.0.0/10" style="flex:1 1 280px"></div>
+        <div class="fld"><div class="lab"><b>Cockpit (finanças) remoto</b><small>Opt-in separado.</small></div>
+          <label><input type="checkbox" id="rem-cockpit"> permitir /cockpit remotamente</label></div>
+        <div class="fld"><div class="lab"><b>Duração da sessão</b><small>dias</small></div>
+          <input id="rem-dias" class="txt" type="number" min="1" max="365" style="width:90px"></div>
+        <div class="fld"><div class="lab"><b>Código de acesso</b><small>Gerar um novo encerra todas as sessões.</small></div>
+          <div><button class="act ghost" onclick="remCodigo(this)">Gerar novo código</button> <span id="rem-codigo-st" class="muted"></span>
+          <div id="rem-codigo" class="codebox" style="display:none"></div></div></div>
+        <div class="row" style="margin-top:12px">
+          <button class="act" onclick="remSalvar(null)">Salvar</button>
+          <button class="act ghost" onclick="remSalvar(true)">Salvar e ATIVAR</button>
+          <button class="act danger" onclick="remSalvar(false)">Desativar</button>
+        </div>
+        <div class="msg" id="rem-msg"></div>
+      </div>
+    </div>
+    <div class="card"><h2>Como expor (escolha um)</h2>
+      <p><b>Tailscale Serve</b> (recomendado, privado na sua tailnet, HTTPS automático):</p>
+      <pre class="cmd">tailscale serve --bg 8790</pre>
+      <small class="note">Host = o nome mostrado por <span class="mono">tailscale serve status</span> (…ts.net). Para internet pública: <span class="mono">tailscale funnel --bg 8790</span>.</small>
+      <p style="margin-top:14px"><b>Cloudflare Tunnel</b> (domínio próprio):</p>
+      <pre class="cmd">cloudflared tunnel --url http://127.0.0.1:8790</pre>
+      <small class="note">Ou túnel nomeado apontando o hostname para http://127.0.0.1:8790. Host = seu hostname.</small>
+      <p style="margin-top:14px"><b>IP público</b>: use um proxy HTTPS no PC (ex.: Caddy <span class="mono">reverse_proxy 127.0.0.1:8790</span>) com o seu domínio. Não exponha a porta 8790 sem TLS.</p>
+      <p style="margin-top:14px"><b>Instalar como app (PWA)</b>: abra o endereço HTTPS → Android/Chrome/Edge: “Instalar app”; iPhone/iPad: Safari → Compartilhar → “Adicionar à Tela de Início”.</p>
+    </div>
+  </section>
 </main>
 
 <script>
 const $=(s,e=document)=>e.querySelector(s), $$=(s,e=document)=>[...e.querySelectorAll(s)];
-const api=async(u,o)=>{const r=await fetch(u,o);try{return await r.json()}catch(e){return{ok:false,message:'reponse invalide'}}};
+const LOCALHOSTS=['127.0.0.1','localhost','[::1]','::1'];
+const api=async(u,o)=>{const r=await fetch(u,Object.assign({credentials:'same-origin'},o||{}));
+  if(r.status===403&&!LOCALHOSTS.includes(location.hostname)&&!u.startsWith('/api/panneau/acces')){location.replace('/acesso');return{ok:false,message:'sessão expirada'}}
+  try{return await r.json()}catch(e){return{ok:false,message:'reponse invalide'}}};
 const post=(u,b)=>api(u,{method:'POST',headers:{'Content-Type':'application/json','X-Jarvis-Panneau':'1'},body:JSON.stringify(b||{})});
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const bYes=(t)=>`<span class="badge on">${esc(t)}</span>`, bNo=(t)=>`<span class="badge off">${esc(t)}</span>`;
@@ -221,6 +316,9 @@ $$('nav button').forEach(b=>b.onclick=()=>{
   $$('.tab').forEach(t=>t.classList.toggle('on',t.id===b.dataset.t));
   if(b.dataset.t==='etat'){chargerEtat();chargerBudget();chargerActivite();chargerTaches();} if(b.dataset.t==='perms')chargerPerms();
   if(b.dataset.t==='reglages')chargerReglages();
+  if(b.dataset.t==='provedores')chargerProvedores();
+  if(b.dataset.t==='eleven')chargerEleven();
+  if(b.dataset.t==='remoto')chargerRemoto();
 });
 const fmt=n=>esc((n||0).toLocaleString('fr-FR'));
 const eur=n=>'$'+(n||0).toFixed(2);
@@ -506,6 +604,145 @@ function flash(r,cell){
   const el = cell? $('.msg',cell) : $('#etat-msg');
   if(el) el.innerHTML=`<span style="color:var(--${r.ok?'ok':'ko'})">${esc(r.message||'')}</span>`;
 }
+
+/* ---------- SESSAO ---------- */
+async function chargerSession(){
+  const d=await api('/api/panneau/session');
+  const dist=d.mode==='distant';
+  const p=$('#pill-mode'); p.textContent=dist?'remoto (autenticado)':'local'; p.classList.toggle('local',!dist);
+  $('#btn-sair').style.display=dist?'':'none';
+}
+async function sair(){await post('/api/acesso/sair',{});location.replace('/acesso');}
+
+/* ---------- PROVEDORES ---------- */
+const PROV={};
+function provMsg(id,r){const el=$('#pm-'+id); if(el) el.innerHTML=`<span style="color:var(--${r.ok?'ok':'ko'})">${esc(r.message||'')}</span>`;}
+function provOptions(id){
+  const p=PROV[id]; const f=($('#pb-'+id)?.value||'').toLowerCase();
+  const lista=(p.modeles||[]).filter(m=>!f||m.toLowerCase().includes(f)).slice(0,400);
+  const atual=p.modele;
+  const opts=lista.map(m=>`<option value="${esc(m)}"${m===atual?' selected':''}>${esc(m)}</option>`).join('');
+  const extra=atual&&!lista.includes(atual)?`<option value="${esc(atual)}" selected>${esc(atual)} (atual)</option>`:'';
+  $('#ps-'+id).innerHTML=(extra+opts)||'<option value="">— teste a conexão para listar os modelos —</option>';
+}
+async function chargerProvedores(){
+  const d=await api('/api/panneau/provedores');
+  const html=(d.provedores||[]).map(p=>{PROV[p.id]=p;
+    const st=p.sans_cle?'<span class="badge">sem chave</span>':(p.configure?bYes('chave '+p.cle_masquee):bNo('sem chave'));
+    const cer=p.cerveau?'<span class="badge">pode ser cérebro</span>':'<span class="badge">conector</span>';
+    const act=p.actif?'<span class="badge on">ATIVO</span>':'';
+    const linhaChave=p.sans_cle
+      ?`<div class="lin"><input id="ph-${p.id}" class="txt" value="${esc(p.hote)}" placeholder="http://localhost:11434">
+         <button class="act" onclick="provHost()">Salvar endereço</button></div>`
+      :`<div class="lin"><input id="pk-${p.id}" class="txt" type="password" autocomplete="off" placeholder="Cole a chave de API">
+         <button class="act" onclick="provChave('${p.id}',false)">Salvar</button>
+         ${p.configure?`<button class="act danger" onclick="provChave('${p.id}',true)">Remover</button>`:''}</div>`;
+    const perfil=(p.id==='openai'||p.id==='anthropic')?`<select id="pp-${p.id}" class="txt" style="min-width:0;flex:0 0 auto">
+         <option value="hybride">perfil diário (hybride)</option><option value="qualite">perfil qualidade</option></select>`:'';
+    return `<div class="prov"><h3>${esc(p.nom)} ${st} ${cer} ${act}
+        <a href="${esc(p.lien)}" target="_blank" rel="noopener" style="margin-left:auto;font-size:12px;color:var(--acc)">obter chave ↗</a></h3>
+      <div class="grid">${linhaChave}
+        <div class="lin"><button class="act ghost" onclick="provTestar('${p.id}',this)">Testar conexão</button>
+          <input id="pb-${p.id}" class="txt" placeholder="Buscar modelo…" oninput="provOptions('${p.id}')"></div>
+        <div class="lin"><select id="ps-${p.id}" class="txt"></select>${perfil}
+          <button class="act ghost" onclick="provModelo('${p.id}')">Salvar modelo</button>
+          ${p.cerveau?`<button class="act" onclick="provAtivar('${p.id}')">Usar como cérebro</button>`:''}</div>
+        <small class="note">Modelo salvo: <span class="mono">${esc(p.modele||'—')}</span>${p.modele_qualite?` · qualidade: <span class="mono">${esc(p.modele_qualite)}</span>`:''}</small>
+        <div class="msg" id="pm-${p.id}"></div></div></div>`;}).join('');
+  $('#prov-lista').innerHTML=html;
+  Object.keys(PROV).forEach(provOptions);
+}
+async function provChave(id,remover){
+  const v=remover?'':($('#pk-'+id).value||'').trim();
+  if(!remover&&!v){provMsg(id,{ok:false,message:'Cole a chave primeiro.'});return}
+  const r=await post('/api/panneau/provedores/chave',{id,chave:v});
+  provMsg(id,r); if(r.ok){await chargerProvedores();provMsg(id,r);}
+}
+async function provHost(){
+  const r=await post('/api/panneau/provedores/ollama-host',{host:$('#ph-ollama').value});
+  provMsg('ollama',r);
+}
+async function provTestar(id,btn){
+  btn.disabled=true; provMsg(id,{ok:true,message:'Testando…'});
+  const r=await post('/api/panneau/provedores/testar',{id}); btn.disabled=false;
+  if(r.ok){PROV[id].modeles=r.modeles||[];provOptions(id);} provMsg(id,r);
+}
+const provSel=id=>($('#ps-'+id)?.value||'').trim();
+const provPerf=id=>$('#pp-'+id)?.value||'hybride';
+async function provModelo(id){
+  const m=provSel(id); if(!m){provMsg(id,{ok:false,message:'Escolha um modelo.'});return}
+  const r=await post('/api/panneau/provedores/modelo',{id,modelo:m,perfil:provPerf(id)});
+  if(r.ok){await chargerProvedores();} provMsg(id,r);
+}
+async function provAtivar(id){
+  const m=provSel(id);
+  const r=await post('/api/panneau/provedores/ativar',{id,modelo:m,perfil:provPerf(id)});
+  if(r.ok){await chargerProvedores();chargerModeles();} provMsg(id,r);
+}
+
+/* ---------- ELEVENLABS ---------- */
+let EL={voix:[],modeles:[],etat:{}};
+const elMsg=r=>$('#el-msg').innerHTML=`<span style="color:var(--${r.ok?'ok':'ko'})">${esc(r.message||'')}</span>`;
+async function chargerEleven(){
+  EL.etat=await api('/api/panneau/elevenlabs');
+  $('#el-badge').innerHTML=EL.etat.configure?bYes('chave '+EL.etat.cle_masquee):bNo('sem chave');
+  if(!EL.etat.configure){EL.voix=[];EL.modeles=[];}
+  elFiltrar(); elModelos();
+}
+function elFiltrar(){
+  const f=($('#el-busca').value||'').toLowerCase(), atual=EL.etat.voix;
+  const l=EL.voix.filter(v=>!f||(v.nom+' '+v.categorie).toLowerCase().includes(f));
+  let h=l.map(v=>`<option value="${esc(v.id)}"${v.id===atual?' selected':''}>${esc(v.nom)}${v.categorie?' · '+esc(v.categorie):''}</option>`).join('');
+  if(atual&&!EL.voix.some(v=>v.id===atual)) h=`<option value="${esc(atual)}" selected>${esc(atual)} (atual)</option>`+h;
+  $('#el-voz').innerHTML=h||'<option value="">— teste a conexão para listar as vozes —</option>';
+}
+function elModelos(){
+  const atual=EL.etat.modele;
+  let h=EL.modeles.map(m=>`<option value="${esc(m.id)}"${m.id===atual?' selected':''}>${esc(m.nom||m.id)}</option>`).join('');
+  if(atual&&!EL.modeles.some(m=>m.id===atual)) h=`<option value="${esc(atual)}" selected>${esc(atual)}</option>`+h;
+  $('#el-modelo').innerHTML=h||'<option value="">— modelo —</option>';
+}
+async function elSalvar(){
+  const v=($('#el-cle').value||'').trim(); if(!v){elMsg({ok:false,message:'Cole a chave primeiro.'});return}
+  const r=await post('/api/panneau/elevenlabs/chave',{chave:v}); if(r.ok)$('#el-cle').value='';
+  await chargerEleven(); elMsg(r);
+}
+async function elRemover(){const r=await post('/api/panneau/elevenlabs/chave',{chave:''});await chargerEleven();elMsg(r);}
+async function elTestar(btn){
+  btn.disabled=true; elMsg({ok:true,message:'Testando…'});
+  const r=await post('/api/panneau/elevenlabs/testar',{}); btn.disabled=false;
+  if(r.ok){EL.voix=r.voix||[];EL.modeles=r.modeles||[];elFiltrar();elModelos();} elMsg(r);
+}
+async function elSelecionar(ativar){
+  const r=await post('/api/panneau/elevenlabs/selecionar',{voz:$('#el-voz').value,modelo:$('#el-modelo').value,ativar});
+  const atual=EL.voix; await chargerEleven(); EL.voix=atual; elFiltrar(); elMsg(r);
+}
+
+/* ---------- ACESSO REMOTO ---------- */
+const remMsg=r=>$('#rem-msg').innerHTML=`<span style="color:var(--${r.ok?'ok':'ko'})">${esc(r.message||'')}</span>`;
+async function chargerRemoto(){
+  const r=await fetch('/api/panneau/acces',{credentials:'same-origin'});
+  if(r.status===403){$('#rem-bloq').style.display='';$('#rem-form').style.display='none';return}
+  const d=await r.json();
+  $('#rem-status').innerHTML=d.actif?bYes('ativo'):bNo('desativado');
+  $('#rem-hosts').value=(d.hotes||[]).join('\n'); $('#rem-redes').value=(d.reseaux||[]).join(', ');
+  $('#rem-cockpit').checked=!!d.cockpit; $('#rem-dias').value=d.duree_session_jours||30;
+  $('#rem-codigo-st').textContent=d.code_defini?'código definido':'nenhum código ainda';
+}
+async function remSalvar(ativar){
+  const corpo={hotes:$('#rem-hosts').value.split(/[\n,]/).map(x=>x.trim()).filter(Boolean),
+    reseaux:$('#rem-redes').value.split(',').map(x=>x.trim()).filter(Boolean),
+    cockpit:$('#rem-cockpit').checked, duree_session_jours:parseInt($('#rem-dias').value||'30',10)};
+  if(ativar!==null) corpo.actif=ativar;
+  const r=await post('/api/panneau/acces',corpo); remMsg(r); if(r.ok) chargerRemoto();
+}
+async function remCodigo(btn){
+  if(!confirm('Gerar um novo código encerra todas as sessões remotas. Continuar?'))return;
+  btn.disabled=true; const r=await post('/api/panneau/acces/code',{}); btn.disabled=false;
+  if(r.ok){const b=$('#rem-codigo');b.textContent=r.code;b.style.display='';}
+  remMsg({ok:r.ok,message:r.ok?'Anote o código agora: ele não será exibido novamente.':r.message}); chargerRemoto();
+}
+chargerSession();
 chargerModeles();
 </script>
 </body>

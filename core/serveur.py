@@ -47,6 +47,16 @@ def app():
         from core.pont_iphone import monter_routes
         monter_routes(_APP)                       # /api/inbox, /api/ping
         try:
+            from core.acces_distant import monter_routes as monter_acces
+            monter_acces(_APP)                    # / et /acesso (acces distant authentifie)
+        except Exception:
+            LOG.exception("montage de l'acces distant")
+        try:
+            from core.pwa import monter_routes as monter_pwa
+            monter_pwa(_APP)                      # /manifest.webmanifest, /sw.js, /pwa/*
+        except Exception:
+            LOG.exception("montage de la PWA")
+        try:
             from core.panneau import monter_routes as monter_panneau
             monter_panneau(_APP)                  # /panneau + /api/panneau/* (LOCAL uniquement)
         except Exception:
@@ -94,7 +104,11 @@ def demarrer():
     # (aucun impact) ; le panneau/cockpit/gestes ne sont donc PAS exposés au LAN.
     # Ne passe à "0.0.0.0" que si tu SAIS ce que tu fais (accès réseau local).
     hote = reglage("serveur.host", "127.0.0.1")
-    config = uvicorn.Config(app(), host=hote, port=port, log_level="warning")
+    # proxy_headers=False : request.client reste l'adresse REELLE de la socket
+    # (127.0.0.1 derriere Tailscale Serve / cloudflared). Sinon uvicorn la remplace
+    # par X-Forwarded-For et les gardes local/distant ne peuvent plus la verifier.
+    config = uvicorn.Config(app(), host=hote, port=port, log_level="warning",
+                            proxy_headers=False)
     serveur = uvicorn.Server(config)
 
     def run():

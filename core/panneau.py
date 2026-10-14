@@ -1,9 +1,11 @@
 """Panneau de configuration web LOCAL de Jarvis.
 
-Servi par le serveur unifie (core.serveur), mais ACCESSIBLE UNIQUEMENT EN LOCAL :
-un garde rejette toute requete arrivant par le tunnel ngrok (en-tete
-X-Forwarded-For, ou Host different de localhost). Le panneau ne passe donc jamais
-par Internet, meme si le meme port sert le pont iPhone.
+Servi par le serveur unifie (core.serveur). Par defaut ACCESSIBLE UNIQUEMENT EN
+LOCAL : un garde rejette toute requete arrivant par un tunnel (en-tete
+X-Forwarded-For, ou Host different de localhost). L'acces distant (Tailscale Serve,
+Cloudflare Tunnel...) n'existe que si l'utilisateur l'active depuis le poste local :
+hote declare + session signee obtenue avec un code (voir core/acces_distant). La
+configuration de cet acces reste modifiable en local seulement.
 
 Doctrine : c'est du Jarvis PUR (config locale). Il AFFICHE l'etat d'Hermes mais ne
 lui donne aucun droit nouveau. Il ecrit seulement ce qui est sans danger : choix de
@@ -457,9 +459,9 @@ def _definir_actif(backend, modele, profil="hybride", fournisseur=""):
         if fournisseur not in {"openai", "anthropic"}:
             return {"ok": False, "message": "Fournisseur cloud inconnu."}
         if fournisseur == "openai" and not reglage("openai.cle", ""):
-            return {"ok": False, "message": "Ajoute d'abord openai.cle dans config.yaml (la cle API est separee de l'abonnement ChatGPT)."}
+            return {"ok": False, "message": "Salve antes a chave OpenAI na aba Provedores IA (a chave de API e separada da assinatura ChatGPT)."}
         if fournisseur == "anthropic" and not reglage("anthropic.cle", ""):
-            return {"ok": False, "message": "Cle Anthropic absente dans config.yaml."}
+            return {"ok": False, "message": "Salve antes a chave Anthropic na aba Provedores IA."}
         profil = "qualite" if profil == "qualite" else "hybride"
         modele = modele or cloud.modele_par_defaut(
             fournisseur, qualite=(profil == "qualite"))
@@ -851,28 +853,45 @@ def _local_seulement(request):
     return requete_locale(getattr(request.client, "host", ""), request.headers)
 
 
+def _mode(request, perimetre="panneau"):
+    """'local', 'distant' (session authentifiee) ou '' : voir core/acces_distant."""
+    from core.acces_distant import mode_acces
+    return mode_acces(getattr(request.client, "host", ""), request.headers,
+                      request.cookies, perimetre)
+
+
 def monter_routes(app):
     """Monte les routes du panneau sur l'app FastAPI unifiee (appelee par core.serveur)."""
     from fastapi import Request
     from fastapi.responses import HTMLResponse, JSONResponse
 
-    def garde(request: Request):
-        if not _local_seulement(request):
+    def garde(request: Request, local=False):
+        """Lecture/ecriture autorisees au poste local ou a une session distante
+        authentifiee (core.acces_distant). local=True : poste local UNIQUEMENT."""
+        mode = _mode(request)
+        if not mode or (local and mode != "local"):
             return JSONResponse({"ok": False,
-                                 "message": "Panneau accessible en local uniquement."},
+                                 "message": "Painel acessível somente localmente."
+                                 if local else "Acesso não autorizado."},
                                 status_code=403)
         # Anti-CSRF sur les ecritures : type MIME EXACT application/json (un simple
         # « contient » laissait passer « text/plain; application/json », envoye sans
         # preflight), en-tete X-Jarvis-Panneau (impose un preflight qu'on ne
-        # satisfait pas) et Origin locale si le navigateur en envoie une.
+        # satisfait pas) et Origin locale si le navigateur en envoie une. A distance,
+        # l'Origin est OBLIGATOIRE et doit designer le meme hote HTTPS autorise.
         if request.method not in ("GET", "HEAD"):
             from core.http_local import origine_locale
             ct = (request.headers.get("content-type", "") or "").split(";")[0].strip().lower()
             if ct != "application/json":
                 return JSONResponse({"ok": False, "message": "Content-Type invalide."},
                                     status_code=415)
-            if (request.headers.get("x-jarvis-panneau") != "1"
-                    or not origine_locale(request.headers.get("origin"))):
+            if mode == "local":
+                origine_ok = origine_locale(request.headers.get("origin"))
+            else:
+                from core.acces_distant import origine_distante_ok
+                origine_ok = origine_distante_ok(request.headers.get("origin"),
+                                                 request.headers.get("host"))
+            if request.headers.get("x-jarvis-panneau") != "1" or not origine_ok:
                 return JSONResponse({"ok": False, "message": "Requete refusee."},
                                     status_code=403)
         return None
@@ -884,8 +903,10 @@ def monter_routes(app):
             return refus
         if not _HTML.exists():
             return HTMLResponse("<h1>Panneau</h1><p>web/panneau.html manquant.</p>", 500)
-        return HTMLResponse(_HTML.read_text(encoding="utf-8"),
-                            headers={"X-Frame-Options": "DENY"})
+        from core.pwa import injecter
+        return HTMLResponse(injecter(_HTML.read_text(encoding="utf-8")),
+                            headers={"X-Frame-Options": "DENY", "Cache-Control": "no-store",
+                                     "Referrer-Policy": "no-referrer"})
 
     # -- lecture --
     @app.get("/api/panneau/modeles")
@@ -999,6 +1020,120 @@ def monter_routes(app):
     def api_reco(request: Request):
         return garde(request) or _reconnecter_mcp()
 
+    # -- session / acces distant --
+    @app.get("/api/panneau/session")
+    def api_session(request: Request):
+        if (r := garde(request)):
+            return r
+        from core import acces_distant
+        return {"mode": _mode(request), "acces_distant": acces_distant.actif()}
+
+    @app.get("/api/panneau/acces")
+    def api_acces(request: Request):
+        if (r := garde(request, local=True)):
+            return r
+        from core import acces_distant
+        return acces_distant.etat_public()
+
+    @app.post("/api/panneau/acces")
+    async def api_acces_definir(request: Request):
+        if (r := garde(request, local=True)):
+            return r
+        from core import acces_distant
+        d = await _corps(request)
+        return acces_distant.configurer(
+            actif_=d.get("actif"), hotes_=d.get("hotes"), reseaux_=d.get("reseaux"),
+            cockpit=d.get("cockpit"), duree_jours=d.get("duree_session_jours"))
+
+    @app.post("/api/panneau/acces/code")
+    def api_acces_code(request: Request):
+        if (r := garde(request, local=True)):
+            return r
+        from core import acces_distant
+        code = acces_distant.generer_code()
+        acces_distant.reinitialiser_echecs()
+        return {"ok": True, "code": code,
+                "message": "Novo código gerado. Sessões remotas anteriores foram encerradas."}
+
+    # -- fournisseurs d'IA (cles en ecriture seule) --
+    @app.get("/api/panneau/provedores")
+    def api_provedores(request: Request):
+        if (r := garde(request)):
+            return r
+        from core import provedores
+        return provedores.lister()
+
+    @app.post("/api/panneau/provedores/chave")
+    async def api_provedor_cle(request: Request):
+        if (r := garde(request)):
+            return r
+        from core import provedores
+        d = await _corps(request)
+        return provedores.enregistrer_cle(str(d.get("id", "")), d.get("chave", ""))
+
+    @app.post("/api/panneau/provedores/ollama-host")
+    async def api_ollama_hote(request: Request):
+        if (r := garde(request)):
+            return r
+        from core import provedores
+        return provedores.enregistrer_hote_ollama((await _corps(request)).get("host", ""))
+
+    @app.post("/api/panneau/provedores/testar")
+    async def api_provedor_test(request: Request):
+        if (r := garde(request)):
+            return r
+        from core import provedores
+        return provedores.tester(str((await _corps(request)).get("id", "")))
+
+    @app.post("/api/panneau/provedores/modelo")
+    async def api_provedor_modele(request: Request):
+        if (r := garde(request)):
+            return r
+        from core import provedores
+        d = await _corps(request)
+        return provedores.choisir_modele(str(d.get("id", "")), d.get("modelo", ""),
+                                         str(d.get("perfil", "hybride")))
+
+    @app.post("/api/panneau/provedores/ativar")
+    async def api_provedor_activer(request: Request):
+        if (r := garde(request)):
+            return r
+        from core import provedores
+        d = await _corps(request)
+        return provedores.activer(str(d.get("id", "")), d.get("modelo", ""),
+                                  str(d.get("perfil", "hybride")))
+
+    # -- ElevenLabs --
+    @app.get("/api/panneau/elevenlabs")
+    def api_eleven(request: Request):
+        if (r := garde(request)):
+            return r
+        from core import provedores
+        return provedores.elevenlabs_etat()
+
+    @app.post("/api/panneau/elevenlabs/chave")
+    async def api_eleven_cle(request: Request):
+        if (r := garde(request)):
+            return r
+        from core import provedores
+        return provedores.elevenlabs_enregistrer_cle((await _corps(request)).get("chave", ""))
+
+    @app.post("/api/panneau/elevenlabs/testar")
+    def api_eleven_test(request: Request):
+        if (r := garde(request)):
+            return r
+        from core import provedores
+        return provedores.elevenlabs_tester()
+
+    @app.post("/api/panneau/elevenlabs/selecionar")
+    async def api_eleven_choix(request: Request):
+        if (r := garde(request)):
+            return r
+        from core import provedores
+        d = await _corps(request)
+        return provedores.elevenlabs_choisir(d.get("voz"), d.get("modelo"),
+                                             bool(d.get("ativar")))
+
     @app.post("/api/panneau/permissions/revoquer")
     async def api_revoquer(request: Request):
         if (r := garde(request)):
@@ -1009,4 +1144,4 @@ def monter_routes(app):
         return {"ok": ok, "message": f"« {nom} » repasse en confirmation a chaque fois."
                 if ok else "Rien a revoquer pour cet outil."}
 
-    LOG.info("panneau monte : /panneau (local uniquement)")
+    LOG.info("panneau monte : /panneau (local + acces distant authentifie si active)")

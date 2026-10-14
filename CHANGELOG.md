@@ -4,6 +4,22 @@ Toutes les évolutions notables de Jarvis. Format inspiré de
 [Keep a Changelog](https://keepachangelog.com/fr/) ; versionnage
 [SemVer](https://semver.org/lang/fr/).
 
+## [Unreleased] — 2026-10-14
+
+### Ajouté
+- Accès distant authentifié au panneau (Tailscale Serve, Cloudflare Tunnel,
+  proxy HTTPS) : hôtes déclarés, code d'accès PBKDF2, session HMAC, opt-in
+  cockpit ; configuration modifiable en local uniquement (`core/acces_distant.py`).
+- Route `/` (redirection panneau / connexion) et page `/acesso`.
+- Onglets « Provedores IA » (clés en écriture seule, test de connexion, recherche
+  et choix du modèle par fournisseur) et « ElevenLabs » (`core/provedores.py`).
+- PWA (manifeste, service worker, icônes) pour desktop, Android et iOS (`core/pwa.py`).
+- Docs `docs/acces_distant.md`, tests `tests/test_acces_distant.py`.
+
+### Modifié
+- Serveur unifié : `proxy_headers=False` (adresse de socket réelle vérifiée).
+- Installateur : plus aucune clé demandée ; Ollama installé nativement en mode local.
+
 ## [1.0.0] — 2026-08-07
 
 Première version publique. Assistant vocal local en français, architecture

@@ -68,7 +68,7 @@ echo [2/3] Chromium pour les fonctions navigateur...
 if errorlevel 1 echo [AVERTISSEMENT] Chromium absent : seules les fonctions web en dependent.
 
 echo.
-echo [3/3] Configuration (mode, cles, test du micro et de la voix)...
+echo [3/3] Configuration (mode, Ollama natif, test du micro et de la voix)...
 "%UV%" run python scripts\setup.py --suite
 if errorlevel 1 (
     echo [ERREUR] La configuration s'est interrompue. Relance ce fichier pour la reprendre.
@@ -78,6 +78,7 @@ if errorlevel 1 (
 echo.
 echo ============================================================
 echo Installation terminee. Pour lancer Jarvis : lancer_jarvis.bat
+echo Cles API, modeles, voix et acces distant : http://127.0.0.1:8790/panneau
 echo ============================================================
 choice /C ON /N /M "Lancer Jarvis maintenant ? [O]ui/[N]on : "
 if errorlevel 2 goto :fin

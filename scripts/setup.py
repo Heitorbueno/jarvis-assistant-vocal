@@ -106,47 +106,55 @@ def ecrire_config(conf):
     print("\n-> config.yaml ecrit.")
 
 
-CLES_CLOUD = [
-    ("anthropic", "cle", True, "Claude (obligatoire en cloud)",
-     "https://console.anthropic.com/  ->  API keys"),
-    ("elevenlabs", "cle", False, "ElevenLabs (voix ; optionnel, sinon voix Windows)",
-     "https://elevenlabs.io  ->  profil  ->  API key"),
-]
+URL_PAINEL = "http://127.0.0.1:8790/panneau"
 
 
 def config_cloud(conf):
-    dire_titre("Mode CLOUD — cles API")
-    conf["mode"] = "cloud"
-    for section, champ, requis, libelle, lien in CLES_CLOUD:
-        print(f"\n{libelle}\n  {lien}")
-        val = lire_cle("  colle la cle (laisse vide pour ignorer) : ")
-        if val:
-            conf.setdefault(section, {})[champ] = val
-        elif requis:
-            print("  (!) sans cle Claude, l'assistant ne pourra pas repondre — tu pourras "
-                  "la mettre plus tard dans config.yaml.")
-    if oui("\nConfigurer les lumieres Philips Hue maintenant ?", False):
-        pont = demander("  IP du pont Hue (ex. 192.168.1.20)")
-        cle = demander("  cle Hue (voir docs/hue.md pour la generer)")
-        if pont:
-            conf.setdefault("hue", {}).update({"pont": pont, "cle": cle})
-    print("\nLes autres integrations (Agenda, Discord, Twilio...) se configurent dans "
-          "config.yaml quand tu veux — chacune a son guide dans docs/.")
+    """Mode cloud : AUCUNE cle demandee ici. Tout se configure dans le panneau
+    (onglets « Provedores IA » et « ElevenLabs ») avec test de connexion."""
+    dire_titre("Mode CLOUD — chaves pelo painel")
+    conf["mode"] = "hybride"
+    print("Nenhuma chave é pedida aqui. Depois de iniciar o Jarvis, abra:")
+    print(f"   {URL_PAINEL}")
+    print("   -> aba « Provedores IA » : salve a chave (OpenAI, Anthropic...), teste a")
+    print("      conexão, escolha o modelo e clique em « Usar como cérebro ».")
+    print("   -> aba « ElevenLabs » : chave, voz e modelo de voz (opcional).")
+    print("\nOutras integrações (Agenda, Discord, Twilio...) têm seu guia em docs/.")
+
+
+def _installer_ollama_natif():
+    """Installe Ollama nativement (winget sous Windows, script officiel sous Linux/macOS)."""
+    if shutil.which("ollama"):
+        return True
+    if WIN and shutil.which("winget"):
+        if oui("Ollama não está instalado. Instalar agora via winget (Ollama.Ollama)?", True):
+            subprocess.run(["winget", "install", "--id", "Ollama.Ollama", "-e", "--source", "winget",
+                            "--accept-source-agreements", "--accept-package-agreements"],
+                           check=False)
+    elif not WIN and shutil.which("curl"):
+        if oui("Ollama não está instalado. Instalar com o script oficial (ollama.com/install.sh)?", True):
+            subprocess.run(["sh", "-c", "curl -fsSL https://ollama.com/install.sh | sh"], check=False)
+    if shutil.which("ollama"):
+        return True
+    padrao = Path(os.environ.get("LOCALAPPDATA", "")) / "Programs" / "Ollama" / "ollama.exe"
+    if WIN and padrao.exists():
+        os.environ["PATH"] = f"{padrao.parent}{os.pathsep}{os.environ.get('PATH', '')}"
+        return True
+    print("Instale manualmente: https://ollama.com/download")
+    input("  Pressione Enter quando o Ollama estiver instalado...")
+    return bool(shutil.which("ollama"))
 
 
 def config_local(conf):
-    dire_titre("Mode LOCAL — 100% hors ligne")
+    dire_titre("Mode LOCAL — Ollama nativo (100% offline)")
     conf["mode"] = "local"
-    if not shutil.which("ollama"):
-        print("Ollama n'est pas installe.\n  Installe-le : https://ollama.com/download")
-        input("  Appuie sur Entree une fois Ollama installe...")
-    modele = demander("Modele Ollama a utiliser", "qwen3.5:4b")
+    _installer_ollama_natif()
+    modele = demander("Modelo Ollama", "qwen2.5:7b")
     conf.setdefault("ollama", {})["modele"] = modele
-    if shutil.which("ollama") and oui(f"Telecharger le modele '{modele}' maintenant ?", True):
+    if shutil.which("ollama") and oui(f"Baixar o modelo '{modele}' agora?", True):
         subprocess.run(["ollama", "pull", modele], check=False)
-    print("\nWhisper (transcription) se telecharge tout seul au 1er lancement.")
-    print("Voix Piper (francais) : telecharge un .onnx dans voix/ (voir docs/local.md). "
-          "Sinon Jarvis parlera avec la voix Windows.")
+    print("\nWhisper (transcrição) é baixado sozinho no 1º uso.")
+    print(f"Modelos, provedores cloud e voz depois: painel {URL_PAINEL}")
 
 
 # --------------------------------------------------------------- materiel + tests
@@ -226,9 +234,9 @@ def main():
     else:
         conf = charger_exemple()
         dire_titre("Mode d'utilisation")
-        print("  1) cloud  — Claude + ElevenLabs (qualite max, cle API requise)")
-        print("  2) local  — Ollama + Piper (100% hors ligne, gratuit, GPU recommande)")
-        choix = demander("Ton choix (1/2)", "1")
+        print("  1) cloud  — chaves de API configuradas depois no painel web")
+        print("  2) local  — Ollama nativo + Piper (100% offline, GPU recomendado)")
+        choix = demander("Sua escolha (1/2)", "1")
         (config_local if choix.strip() == "2" else config_cloud)(conf)
         ecrire_config(conf)
 
@@ -239,6 +247,7 @@ def main():
     dire_titre("Termine !")
     print("Lance Jarvis :  double-clic sur lancer_jarvis.bat, ou  uv run python jarvis14.py")
     print("               (puis dis « Hey Jarvis »)")
+    print(f"Painel (chaves, modelos, voz, acesso remoto) :  {URL_PAINEL}")
     print("Un souci ? Diagnostic :  python scripts/doctor.py")
 
 
