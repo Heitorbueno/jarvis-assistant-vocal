@@ -1,0 +1,15 @@
+{
+  "id": "/",
+  "name": "Jarvis — Assistente Pessoal",
+  "short_name": "Jarvis",
+  "description": "Interface pessoal e privada do assistente Jarvis.",
+  "lang": "pt-BR",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#09121e",
+  "theme_color": "#09121e",
+  "icons": [
+    {"src": "/pwa/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any"}
+  ]
+}
