@@ -1255,9 +1255,13 @@ def _installer_raccourci_micro():
 def main():
     print("Chargement des modeles...")
 
-    serveur_sans_peripheriques = bool(
-        config.reglage("poste_principal.actif", False)
-        and config.reglage("poste_principal.serveur_sans_peripheriques", False))
+    # Opt-in explicite pour un serveur Linux/LXC sans micro, sans changer le mode normal.
+    serveur_sans_peripheriques = (
+        os.environ.get("JARVIS_HEADLESS", "").strip().lower() in {"1", "true", "yes"}
+        or bool(
+            config.reglage("poste_principal.actif", False)
+            and config.reglage("poste_principal.serveur_sans_peripheriques", False))
+    )
 
     registre.charger_outils()
     voix.definir_parleur(dire)
