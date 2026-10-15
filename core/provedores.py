@@ -164,7 +164,9 @@ def lister() -> dict:
             "modeles": cache.get("modeles", []),
             "teste_a": cache.get("ts", 0),
         })
-    return {"provedores": out, "mode": mode, "repli": repli_etat()}
+    from core import diagnostic_llm
+    return {"provedores": out, "mode": mode, "repli": repli_etat(),
+            "ultimo_erro": diagnostic_llm.dernier()}
 
 
 def enregistrer_cle(pid: str, cle) -> dict:
@@ -254,6 +256,13 @@ def activer(pid: str, modele, profil: str = "hybride") -> dict:
 
 
 def _apres_changement(pid: str) -> None:
+    # Le provider LLM met en cache son client (cle) et son modele : sans cela, une
+    # cle ajoutee dans le panneau n'etait prise en compte qu'au redemarrage.
+    try:
+        from core import llm
+        llm.reinitialiser()
+    except Exception:
+        pass
     if pid == "openai":
         try:
             from core import panneau

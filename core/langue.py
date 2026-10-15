@@ -183,6 +183,16 @@ _EXACTES = {
         "Vou parar aqui para evitar um ciclo de ações. Reformule a tarefa com mais precisão se quiser que eu continue.",
     "je n'ai pas reussi a terminer cette demande sans depasser mes limites.":
         "Não consegui concluir este pedido sem ultrapassar meus limites.",
+    "la cle api du modele est refusee. verifie-la dans le panneau, onglet provedores ia.":
+        "A chave de API do modelo foi recusada. Confira no painel, aba Provedores IA.",
+    "ce modele n'existe pas ou n'est pas accessible avec cette cle. choisis-en un autre dans le panneau.":
+        "Este modelo não existe ou não está liberado para esta chave. Escolha outro no painel.",
+    "le fournisseur refuse la demande : credit epuise ou limite atteinte.":
+        "O provedor recusou o pedido: crédito esgotado ou limite atingido.",
+    "je n'arrive pas a joindre le fournisseur du modele : verifie la connexion internet.":
+        "Não consigo falar com o provedor do modelo: verifique a conexão com a internet.",
+    "aucune cle api n'est configuree pour ce fournisseur. ajoute-la dans le panneau.":
+        "Nenhuma chave de API configurada para este provedor. Adicione no painel.",
     "test de la voix jarvis. la voix selectionnee est active.":
         "Teste da voz do Jarvis. A voz selecionada está ativa.",
 }

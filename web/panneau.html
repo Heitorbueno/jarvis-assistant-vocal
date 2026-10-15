@@ -82,6 +82,7 @@
   <h1>Jarvis — Panneau de configuration</h1>
   <span id="pill-mode" class="pill local">local</span>
   <span id="hdr" class="muted" style="margin-left:auto;font-size:12px"></span>
+  <button id="btn-instalar" class="act" style="display:none" onclick="instalarApp()">Instalar app</button>
   <select id="sel-langue" class="txt" style="min-width:0;width:auto" title="Idioma" onchange="mudarIdioma(this.value)">
     <option value="fr">FR</option><option value="pt">PT-BR</option>
   </select>
@@ -121,6 +122,30 @@
   </section>
 
   <section id="reglages" class="tab">
+    <div class="card"><h2>Iniciar com o computador</h2>
+      <div id="as-bloq" class="lock" style="display:none">Só pode ser alterado no próprio PC.</div>
+      <div id="as-form">
+        <div class="fld"><div class="lab"><b>Início automático</b>
+          <small>Ligou o computador → o Jarvis já fica ouvindo « Hey Jarvis ». Windows: tarefa agendada / pasta Inicializar. Linux: systemd.</small></div>
+          <span id="as-status" class="muted">—</span></div>
+        <div class="fld" id="as-modo-linha" style="display:none"><div class="lab"><b>Modo (Linux)</b>
+          <small>Completo = com microfone e voz (sessão do usuário). Servidor = LXC/servidor sem som (painel, acesso remoto).</small></div>
+          <select id="as-modo" class="txt"><option value="completo">Completo</option><option value="servidor">Servidor</option></select></div>
+        <div class="row" style="margin-top:10px">
+          <button class="act" onclick="asDefinir(true)">Ativar</button>
+          <button class="act danger" onclick="asDefinir(false)">Desativar</button></div>
+        <div class="msg" id="as-msg"></div>
+      </div>
+    </div>
+    <div class="card"><h2>Prompt comportamental</h2>
+      <div class="muted" style="font-size:13px;margin-bottom:8px">Como o Jarvis deve se comportar: tom, como te chamar, contexto do seu trabalho, preferências.
+        Não altera as regras de segurança (confirmações N2/N3 continuam valendo).</div>
+      <textarea id="txt-instrucoes" rows="5" maxlength="3000" style="width:100%;background:var(--card2);color:var(--txt);border:1px solid var(--bord);border-radius:8px;padding:8px;font:13px/1.4 inherit"
+        placeholder="Ex.: Me chame de Heitor. Sou representante comercial em Cuiabá. Respostas curtas, valores em reais."></textarea>
+      <div class="row" style="margin-top:8px"><button class="act" onclick="salvarInstrucoes()">Salvar prompt</button>
+        <span class="muted" id="instr-cont" style="font-size:12px"></span></div>
+      <div class="msg" id="instr-msg"></div>
+    </div>
     <div class="card"><h2>Mode de routage</h2>
       <div class="fld"><div class="lab"><b>Où réfléchit Jarvis</b>
         <small>Local = hors ligne. Hybride = modèle quotidien économique du fournisseur choisi + Hermes pour le fond. Qualité = modèle puissant séparé.</small></div>
@@ -235,6 +260,7 @@
       <div class="muted" style="font-size:13px;margin-bottom:12px">As chaves ficam somente no <span class="mono">config.yaml</span> deste PC e
         nunca são devolvidas ao navegador. <b>Testar conexão</b> lista os modelos da sua conta (sem custo).
         OpenAI, Anthropic e Ollama podem ser o <b>cérebro</b> do Jarvis; os demais ficam salvos para conectores.</div>
+      <div id="ultimo-erro"></div>
       <div id="prov-lista"></div>
     </div>
     <div class="card"><h2>Ordem de fallback</h2>
@@ -389,7 +415,7 @@ $$('nav button').forEach(b=>b.onclick=()=>{
   $$('nav button').forEach(x=>x.classList.toggle('on',x===b));
   $$('.tab').forEach(t=>t.classList.toggle('on',t.id===b.dataset.t));
   if(b.dataset.t==='etat'){chargerEtat();chargerBudget();chargerActivite();chargerTaches();} if(b.dataset.t==='perms')chargerPerms();
-  if(b.dataset.t==='reglages')chargerReglages();
+  if(b.dataset.t==='reglages'){chargerReglages();chargerAutostart();chargerInstrucoes();}
   if(b.dataset.t==='provedores')chargerProvedores();
   if(b.dataset.t==='eleven'){chargerEleven();chargerAjustesVoz();}
   if(b.dataset.t==='vozlocal'){chargerVozLocal();chargerAjustesVoz();}
@@ -688,6 +714,13 @@ async function chargerSession(){
   $('#btn-sair').style.display=dist?'':'none';
 }
 async function sair(){await post('/api/acesso/sair',{});location.replace('/acesso');}
+let PEDIDO_INSTALACAO=null;
+addEventListener('beforeinstallprompt',e=>{e.preventDefault();PEDIDO_INSTALACAO=e;const b=$('#btn-instalar');if(b)b.style.display='';});
+addEventListener('appinstalled',()=>{const b=$('#btn-instalar');if(b)b.style.display='none';});
+async function instalarApp(){
+  if(PEDIDO_INSTALACAO){PEDIDO_INSTALACAO.prompt();await PEDIDO_INSTALACAO.userChoice;PEDIDO_INSTALACAO=null;$('#btn-instalar').style.display='none';}
+  else alert('No iPhone/iPad: Safari → Compartilhar → Adicionar à Tela de Início.');
+}
 async function mudarIdioma(v){
   const r=await post('/api/panneau/reglage',{cle:'assistant.langue',valeur:v});
   if(r.ok) location.reload(); else alert(r.message||'erro');
@@ -740,6 +773,10 @@ async function chargerProvedores(){
   $('#prov-lista').innerHTML=html;
   Object.keys(PROV).forEach(provOptions);
   ollamaDetectar();
+  const ue=d.ultimo_erro||{};
+  const ueEl=$('#ultimo-erro'); if(ueEl) ueEl.innerHTML=ue.code?`<div class="lock" style="background:#3a1c1c;border-color:#5a2020;color:#ffb0b0">
+    Último erro do modelo (${esc(ue.fournisseur)} ${esc(ue.modele)}): <b>${esc({auth:'chave recusada',modele:'modelo inexistente/sem acesso',quota:'sem crédito/limite',reseau:'sem conexão',cle_absente:'chave ausente',inconnu:'erro desconhecido'}[ue.code]||ue.code)}</b>
+    <div class="mono" style="margin-top:4px">${esc(ue.detail)}</div></div>`:'';
   FB=(d.repli&&d.repli.ordem)||[]; $('#fb-ativo').checked=!!(d.repli&&d.repli.ativo); fbRender();
 }
 let FB=[];
@@ -957,6 +994,30 @@ async function importarPiper(btn){
   btn.disabled=true; fl('vl-imp-msg',{ok:true,message:'Enviando…'});
   const r=await post('/api/panneau/voz/piper/importar',{nome:a.name,onnx:await lerB64(a),json:await lerB64(j)});
   btn.disabled=false; fl('vl-imp-msg',r); chargerVozLocal();
+}
+
+/* ---------- PROMPT COMPORTAMENTAL ---------- */
+async function chargerInstrucoes(){
+  const d=await api('/api/panneau/reglages'); const t=$('#txt-instrucoes');
+  if(t){t.value=d.instructions||'';$('#instr-cont').textContent=t.value.length+'/3000';}
+}
+document.addEventListener('input',e=>{if(e.target&&e.target.id==='txt-instrucoes')$('#instr-cont').textContent=e.target.value.length+'/3000';});
+async function salvarInstrucoes(){
+  fl('instr-msg',await post('/api/panneau/reglage',{cle:'assistant.instructions',valeur:$('#txt-instrucoes').value}));
+}
+
+/* ---------- INICIO AUTOMATICO ---------- */
+async function chargerAutostart(){
+  const r=await fetch('/api/panneau/autostart',{credentials:'same-origin'});
+  if(r.status===403){$('#as-bloq').style.display='';$('#as-form').style.display='none';return}
+  const d=await r.json();
+  $('#as-status').innerHTML=!d.suportado?bNo('não suportado neste sistema'):(d.ativo?bYes('ativo · '+(d.metodo||'')):bNo('desativado'));
+  $('#as-modo-linha').style.display=String(d.sistema||'').startsWith('linux')?'':'none';
+  if(d.modo) $('#as-modo').value=d.modo;
+}
+async function asDefinir(ativar){
+  fl('as-msg',{ok:true,message:'Aplicando…'});
+  fl('as-msg',await post('/api/panneau/autostart',{ativar,modo:$('#as-modo').value})); chargerAutostart();
 }
 
 /* ---------- ACESSO REMOTO ---------- */

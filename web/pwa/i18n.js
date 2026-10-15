@@ -83,6 +83,24 @@
     "Voix activee pour la prochaine reponse.": "Voz ativada para a próxima resposta.",
     "Test vocal lance.": "Teste de voz iniciado.",
     "Abonnements": "Assinaturas", "Finances": "Finanças", "Cockpit": "Cockpit",
+    // HUD (reacteur)
+    "Systeme": "Sistema", "Modele": "Modelo", "Ecoute": "Escuta", "Niveau": "Nível",
+    "Routage": "Roteamento", "Budget": "Orçamento", "Hors ligne": "Offline", "En ligne": "Online",
+    "VEILLE": "EM ESPERA", "ECOUTE": "OUVINDO", "REFLEXION": "PENSANDO", "PAROLE": "FALANDO",
+    "MUET": "MUDO", "Vous": "Você", "au repos": "em repouso",
+    "⏳ En attente de confirmation…": "⏳ Aguardando confirmação…",
+    "🔇 Micro coupé": "🔇 Microfone mudo", "DÉMO — rien n'est réel": "DEMO — nada é real",
+    "Commandes rapides": "Comandos rápidos",
+    "Chargement de la configuration…": "Carregando configuração…",
+    "Profil cloud & modèle": "Perfil de nuvem e modelo", "Fournisseur": "Provedor",
+    "Activer hybride": "Ativar híbrido", "Activer qualité": "Ativar qualidade",
+    "Hybride privilégie Luna chez OpenAI et Haiku chez Claude, sauf choix manuel.":
+      "O híbrido prefere Luna na OpenAI e Haiku na Claude, salvo escolha manual.",
+    "Modèle local": "Modelo local", "Moteur TTS": "Motor de voz",
+    "Ouvrir le panneau complet →": "Abrir o painel completo →",
+    "Écrire à Jarvis…": "Escreva para o Jarvis…", "Envoyer": "Enviar", "Chargement…": "Carregando…",
+    "Ollama est hors ligne": "Ollama está offline", "Aucune voix chargée": "Nenhuma voz carregada",
+    "Clé ElevenLabs absente": "Chave ElevenLabs ausente",
   };
 
   // Onglets ajoutés en portugais -> français quand la langue est fr.

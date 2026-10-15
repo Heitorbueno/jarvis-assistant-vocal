@@ -76,6 +76,10 @@ if errorlevel 1 (
 )
 
 echo.
+echo Atalhos "Jarvis" e "Jarvis Painel" (Area de Trabalho e Menu Iniciar)...
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\criar_atalhos.ps1"
+
+echo.
 echo ============================================================
 echo Installation terminee. Pour lancer Jarvis : lancer_jarvis.bat
 echo Cles API, modeles, voix et acces distant : http://127.0.0.1:8790/panneau

@@ -40,6 +40,11 @@ PORT = 8770
 _FICHIER_HTML = Path(__file__).parent / "hud.html"
 # <title> de hud.html : sert a retrouver la fenetre du HUD parmi les autres.
 TITRE_FENETRE = "JARVIS · Reacteur arc"
+# Titres equivalents : un navigateur qui traduit la page (Edge/Chrome « Traduire »)
+# renomme la fenetre ; sans cela elle n'est plus reconnue et une NOUVELLE fenetre
+# s'ouvre a chaque « Jarvis ». La page est aussi marquee translate="no".
+TITRES_FENETRE = (TITRE_FENETRE, "JARVIS · Reator arc", "JARVIS · Reator Arc",
+                  "JARVIS · Arc reactor", "JARVIS · Arc Reactor", "JARVIS · Reactor arc")
 # Une fenetre fermee n'est rouverte qu'une fois par minute au plus.
 _DELAI_REOUVERTURE = 60.0
 _MODE_FENETRE = "navigateur"
@@ -66,7 +71,11 @@ _ETAT = {
     "budget": None,
     "hermes": None,
     "micro": False,
+    "chat": False,
 }
+
+# Commandes TAPEES dans le chat du HUD, consommees par la boucle principale.
+_TEXTES = queue.Queue(maxsize=10)
 
 # Une file par onglet connecte. Le verrou protege l'ensemble.
 _CLIENTS = set()
@@ -128,6 +137,26 @@ def outil(nom, detail=""):
     evenement = {"t": "outil", "nom": str(nom), "detail": str(detail)}
     _HISTORIQUE.append(evenement)
     _diffuser(evenement)
+
+
+def chat(visible):
+    """Affiche ou masque le chat (historique + saisie) du HUD. Masque par defaut."""
+    _ETAT["chat"] = bool(visible)
+    _diffuser({"t": "chat", "v": bool(visible)})
+
+
+def texte_en_attente():
+    """Commande tapee dans le chat du HUD, ou None (non bloquant)."""
+    try:
+        return _TEXTES.get_nowait()
+    except queue.Empty:
+        return None
+
+
+def clients_connectes():
+    """Nombre de pages HUD ouvertes (flux SSE actifs)."""
+    with _VERROU:
+        return len(_CLIENTS)
 
 
 def config(modele, stt):
@@ -348,12 +377,43 @@ class _Poignee(BaseHTTPRequestHandler):
             self._controle_etat()
         elif chemin in ("/", "/hud.html", "/index.html"):
             self._page()
+        elif chemin == "/manifest.webmanifest":
+            self._fichier_pwa("manifest")
+        elif chemin == "/sw.js":
+            self._fichier_pwa("sw")
+        elif chemin.startswith("/pwa/"):
+            self._fichier_pwa(chemin[5:])
         else:
             self.send_error(404)
 
+    def _fichier_pwa(self, nom):
+        """HUD installable comme application (localhost = contexte securise)."""
+        try:
+            from core import pwa
+            if nom == "manifest":
+                m = dict(pwa.MANIFESTE, id="/hud", name="Jarvis — Reator", short_name="Jarvis",
+                         start_url="/?origem=pwa", description="Jarvis — reator arc")
+                corps, type_ = json.dumps(m, ensure_ascii=False).encode("utf-8"), "application/manifest+json"
+            elif nom == "sw":
+                corps, type_ = pwa.SERVICE_WORKER.encode("utf-8"), "application/javascript"
+            elif nom in pwa._FICHIERS and (pwa._DOSSIER / nom).is_file():
+                corps, type_ = (pwa._DOSSIER / nom).read_bytes(), pwa._FICHIERS[nom]
+            else:
+                self.send_error(404)
+                return
+        except Exception:
+            self.send_error(404)
+            return
+        self.send_response(200)
+        self.send_header("Content-Type", type_)
+        self.send_header("Content-Length", str(len(corps)))
+        self.send_header("Cache-Control", "no-cache")
+        self.end_headers()
+        self.wfile.write(corps)
+
     def do_POST(self):
         chemin = self.path.split("?", 1)[0]
-        if chemin != "/api/controle":
+        if chemin not in ("/api/controle", "/api/chat"):
             self.send_error(404)
             return
         if not self._locale():
@@ -375,6 +435,22 @@ class _Poignee(BaseHTTPRequestHandler):
             return
         try:
             donnees = json.loads(self.rfile.read(taille).decode("utf-8"))
+            if chemin == "/api/chat":
+                if (donnees or {}).get("fechar"):
+                    chat(False)
+                    self._json({"ok": True})
+                    return
+                texte = " ".join(str((donnees or {}).get("texte", "")).split())[:500]
+                if not texte:
+                    self._json({"ok": False, "message": "Texto vazio."}, 400)
+                    return
+                try:
+                    _TEXTES.put_nowait(texte)
+                except queue.Full:
+                    self._json({"ok": False, "message": "Aguarde a resposta anterior."}, 429)
+                    return
+                self._json({"ok": True})
+                return
             resultat = _appliquer_controle(donnees)
             self._json(resultat, 200 if resultat.get("ok") else 400)
         except Exception as e:
@@ -400,10 +476,11 @@ class _Poignee(BaseHTTPRequestHandler):
 
     def _page(self):
         try:
-            corps = _FICHIER_HTML.read_bytes()
+            corps = _FICHIER_HTML.read_text(encoding="utf-8")
         except OSError:
             self.send_error(500, "hud.html introuvable")
             return
+        corps = _preparer_page(corps).encode("utf-8")
         self.send_response(200)
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self.send_header("Content-Length", str(len(corps)))
@@ -442,6 +519,7 @@ class _Poignee(BaseHTTPRequestHandler):
                 self._pousser({"t": "hermes", "taches": h["taches"],
                                "tokens": h["tokens"]})
             self._pousser({"t": "micro", "v": _ETAT.get("micro", False)})
+            self._pousser({"t": "chat", "v": _ETAT.get("chat", False)})
             for evenement in list(_HISTORIQUE):
                 self._pousser(evenement)
 
@@ -466,6 +544,32 @@ class _Poignee(BaseHTTPRequestHandler):
     def _ecrire(self, donnees):
         self.wfile.write(b"data: " + donnees.encode("utf-8") + b"\n\n")
         self.wfile.flush()
+
+
+def _preparer_page(html):
+    """Langue (assistant.langue) + traduction integree + PWA. Le titre de la fenetre
+    reste TITRE_FENETRE pour que mettre_au_premier_plan() la retrouve."""
+    try:
+        from core import langue
+        code = langue.code()
+    except Exception:
+        code = "fr"
+    html = html.replace('<html lang="fr">',
+                        f'<html lang="{"pt-BR" if code == "pt" else "fr"}" data-langue="{code}" '
+                        'translate="no" class="notranslate">', 1)
+    entete = ('<meta name="google" content="notranslate">'
+              '<link rel="manifest" href="/manifest.webmanifest">'
+              '<meta name="theme-color" content="#04070a">'
+              '<link rel="icon" type="image/png" href="/pwa/favicon.png">'
+              '<link rel="apple-touch-icon" href="/pwa/apple-touch-icon.png">'
+              "<script>if('serviceWorker' in navigator){addEventListener('load',()=>"
+              "navigator.serviceWorker.register('/sw.js').catch(()=>{}))}</script>")
+    try:
+        i18n = (Path(__file__).parent / "web" / "pwa" / "i18n.js").read_text(encoding="utf-8")
+        entete += "<script>" + i18n + "</script>"
+    except OSError:
+        pass
+    return html.replace("</head>", entete + "</head>", 1)
 
 
 class _Serveur(ThreadingHTTPServer):
@@ -571,8 +675,9 @@ def _user32():
     return user32
 
 
-def trouver_fenetres(titre=TITRE_FENETRE):
-    """Fenetres visibles (y compris reduites) dont le titre contient `titre`. Lecture seule."""
+def trouver_fenetres(titre=None):
+    """Fenetres visibles (y compris reduites) dont le titre contient `titre` (par defaut
+    l'un des TITRES_FENETRE, traductions comprises). Lecture seule."""
     if sys.platform != "win32":
         return []
     import ctypes
@@ -587,7 +692,8 @@ def trouver_fenetres(titre=TITRE_FENETRE):
             if longueur:
                 tampon = ctypes.create_unicode_buffer(longueur + 1)
                 user32.GetWindowTextW(hwnd, tampon, longueur + 1)
-                if titre in tampon.value:
+                titres = (titre,) if titre else TITRES_FENETRE
+                if any(t in tampon.value for t in titres):
                     trouvees.append(hwnd)
         return True
 
@@ -690,6 +796,10 @@ def mettre_au_premier_plan():
         return False
     fenetres = trouver_fenetres()
     if not fenetres:
+        # Une page HUD encore connectee (titre inattendu, autre bureau virtuel...)
+        # prouve qu'une fenetre existe : ne JAMAIS en ouvrir une seconde.
+        if clients_connectes() > 0:
+            return False
         if (_MODE_FENETRE == "app"
                 and time.monotonic() - _DERNIERE_OUVERTURE > _DELAI_REOUVERTURE):
             ouvrir_fenetre()

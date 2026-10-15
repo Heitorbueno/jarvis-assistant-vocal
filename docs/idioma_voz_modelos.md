@@ -45,3 +45,30 @@ um modelo por provedor, sem fallback, sem ajustes de voz).
 - **Voz local (Piper)**: baixar vozes do catálogo oficial (pt_BR e fr_FR), importar
   `.onnx` + `.onnx.json`, escolher, remover e ajustar velocidade e entonação.
   Kokoro: velocidade.
+
+## 5. Iniciar com o computador, chat e prompt
+
+- **Início automático** (painel › Ajustes, ou `uv run python scripts/autostart.py`):
+  Windows usa o método original (`autostart_install.ps1`: tarefa agendada ou pasta
+  Inicializar → `demarrer_jarvis_complet.ps1`, que não abre duas instâncias).
+  Linux usa systemd: modo **completo** (serviço do usuário, com som) ou **servidor**
+  (`--modo servidor`, root; LXC/servidor sem som: painel, acesso remoto e PWA via
+  `scripts/jarvis_servidor.py`).
+- **Janela duplicada ao dizer "Jarvis"**: a tradução automática do navegador renomeava
+  a janela do HUD e ela não era encontrada. A página agora é `translate="no"`, o HUD
+  é traduzido pelo próprio Jarvis e nenhuma janela nova abre enquanto uma página HUD
+  estiver conectada.
+- **Chat de texto**: oculto sempre; abre só por voz (« abre o chat ») e fecha pelo ×
+  ou « fecha o chat ». A transcrição fica dentro dele, sem cobrir o reator.
+- **Prompt comportamental** (painel › Ajustes): tom, como te chamar, contexto.
+  Não altera confirmações N2/N3.
+- **Instalar como app**: botão « Instalar app » no painel (Chrome/Edge); o HUD em
+  `http://127.0.0.1:8770/` também é instalável. O instalador cria os atalhos
+  « Jarvis » e « Jarvis Painel » (`scripts/criar_atalhos.ps1`).
+- **Configuração**: continua só o `config.yaml` (não versionado, sem `.env`). Cada
+  chave nova tem padrão no código, então atualizar nunca exige editar o arquivo.
+  Gravação atômica com cópia em `config.yaml.bak`; `JARVIS_CONFIG=/caminho` permite
+  outro local (LXC/serviço).
+- **"Não consigo falar com o modelo"**: agora o Jarvis diz a causa (chave recusada,
+  modelo inexistente, sem crédito, sem rede, chave ausente) e o painel mostra o
+  último erro em Provedores IA.

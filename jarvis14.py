@@ -146,8 +146,23 @@ def _refaire_systeme(memoire_courante):
         config.reglage("assistant.personnalite", personnalite.DEFAUT))
     SYSTEME_COURANT = (persona + "\n\n" + SYSTEME_BASE
                        + memoire.texte_pour_systeme(memoire_courante)
+                       + _instructions_utilisateur()
                        + langue.consigne_systeme())
-    _LANGUE_SYSTEME[0] = langue.code()
+    _LANGUE_SYSTEME[0] = _signature_systeme()
+
+
+def _instructions_utilisateur():
+    """Prompt comportamental saisi dans le panneau (ton, habitudes, contexte).
+    Ne peut lever aucun verrou : confirmations N2/N3 et permissions sont dans le code."""
+    texte = str(config.reglage("assistant.instructions", "") or "").strip()[:3000]
+    if not texte:
+        return ""
+    return ("\n\nPreferences de comportement donnees par l'utilisateur (a suivre sauf si elles "
+            "contredisent les regles de securite et de confirmation ci-dessus) :\n" + texte)
+
+
+def _signature_systeme():
+    return (langue.code(), str(config.reglage("assistant.instructions", "") or ""))
 
 
 # ---------------------------------------------------------------- HUD (option)
@@ -681,8 +696,8 @@ def repondre(historique):
     les outils a confirmation, prononce l'annonce et renvoie SENTINEL_CONFIRM
     (la suite est geree par traiter, qui capture la reponse oui/non).
     """
-    if _LANGUE_SYSTEME[0] is not None and _LANGUE_SYSTEME[0] != langue.code():
-        _refaire_systeme(memoire.charger())   # langue changee depuis le panneau
+    if _LANGUE_SYSTEME[0] is not None and _LANGUE_SYSTEME[0] != _signature_systeme():
+        _refaire_systeme(memoire.charger())   # langue ou prompt change depuis le panneau
     prioritaire = _repondre_route_prioritaire_commune(historique)
     if prioritaire is not None:
         return prioritaire
@@ -748,7 +763,9 @@ def repondre(historique):
         except Exception as e:
             print(f"  [{fournisseur.nom}] erreur : {e}")
             LOG.exception("appel LLM en echec")
-            return arreter_tour("Je n'arrive pas a joindre le modele pour le moment.")
+            from core import diagnostic_llm
+            return arreter_tour(diagnostic_llm.enregistrer(
+                e, fournisseur.nom, getattr(fournisseur, "modele", "")))
 
         if reponse.stop_reason == "tool_use":
             _hud("etat", "reflexion")
@@ -1169,7 +1186,11 @@ def traiter(audio, whisper, historique, flux, reveil):
     if not question or len(question) < 3:
         print("  (rien compris)\n")
         return False
+    return traiter_question(question, whisper, historique, flux, reveil)
 
+
+def traiter_question(question, whisper, historique, flux, reveil):
+    """Repond a une question deja transcrite (voix) ou tapee (chat du HUD)."""
     print(f"  Vous : {question}")
     _hud("dire_vous", question)
     _hud("etat", "reflexion")
@@ -1472,6 +1493,15 @@ def main():
     try:
         while True:
             suite = enchainer
+            if not enchainer and hud is not None:
+                # Commande tapee dans le chat du HUD (ouvert a la voix) : meme
+                # traitement qu'une phrase dite, confirmations N2/N3 comprises.
+                tapee = getattr(hud, "texte_en_attente", lambda: None)()
+                if tapee:
+                    if traiter_question(tapee, whisper, historique, flux, reveil):
+                        enchainer = attendre_suite(flux, tampon)
+                    _hud("etat", "veille")
+                    continue
             if not enchainer:
                 bloc = lire_bloc(flux)
                 tampon.append(bloc)

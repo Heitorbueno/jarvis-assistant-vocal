@@ -119,6 +119,37 @@
     transition: color 0.4s ease;
   }
 
+
+  /* --- colonnes laterales : ne recouvrent jamais le reacteur --- */
+  :root { --col: calc((100vw - min(72vmin, 640px)) / 2 - 64px); }
+  .chat {
+    position: fixed; left: 40px; top: 300px; bottom: 24px;
+    width: min(380px, var(--col));
+    display: none; flex-direction: column; gap: 8px; z-index: 6;
+    background: rgba(4,10,14,0.72); border: 1px solid rgba(70,140,160,0.25);
+    border-radius: 10px; padding: 10px 12px;
+  }
+  body.chat-aberto .chat { display: flex; }
+  .chat-entete { display: flex; justify-content: space-between; align-items: center;
+    font-size: 10px; letter-spacing: 3px; color: var(--texte-faible); text-transform: uppercase; }
+  .chat-entete button { background: none; border: 0; color: var(--texte-faible); cursor: pointer; font-size: 14px; }
+  .chat .transcription {
+    position: static; transform: none; width: auto; max-height: none;
+    flex: 1; overflow-y: auto; -webkit-mask-image: none; mask-image: none;
+    justify-content: flex-start;
+  }
+  .chat form { display: flex; gap: 6px; }
+  .chat input {
+    flex: 1; min-width: 0; background: rgba(10,22,30,0.9); color: var(--texte);
+    border: 1px solid rgba(70,140,160,0.35); border-radius: 6px; padding: 7px 9px;
+    font: 12.5px var(--mono);
+  }
+  .chat form button {
+    background: rgba(111,227,255,0.12); color: var(--vous); border: 1px solid rgba(111,227,255,0.4);
+    border-radius: 6px; padding: 0 10px; font: 11px var(--mono); letter-spacing: 1px; cursor: pointer;
+  }
+  @media (max-width: 1100px) { .chat { width: min(340px, 42vw); } }
+
   /* --- transcription, en bas --- */
   .transcription {
     position: fixed;
@@ -358,7 +389,15 @@
     <a class="controle-panneau" id="lienPanneau" href="#">Ouvrir le panneau complet →</a>
   </aside>
 
-  <div class="transcription" id="transcription"></div>
+  <aside class="chat" id="chat" aria-hidden="true">
+    <div class="chat-entete"><span>Chat</span>
+      <button type="button" id="fecharChat" title="Fermer">×</button></div>
+    <div class="transcription" id="transcription"></div>
+    <form id="formChat" autocomplete="off">
+      <input id="entreeChat" maxlength="500" placeholder="Écrire à Jarvis…">
+      <button type="submit">Envoyer</button>
+    </form>
+  </aside>
 
   <div class="coin hg"></div>
   <div class="coin hd"></div>
@@ -759,16 +798,22 @@ function echap(s) {
 
 // ------------------------------------------------------------- horloge
 
-const JOURS = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi",
-               "Vendredi", "Samedi"];
-const MOIS = ["Janvier", "Fevrier", "Mars", "Avril", "Mai", "Juin", "Juillet",
-              "Aout", "Septembre", "Octobre", "Novembre", "Decembre"];
+const PT = (document.documentElement.dataset.langue || "fr") === "pt";
+const JOURS = PT
+  ? ["Domingo", "Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado"]
+  : ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
+const MOIS = PT
+  ? ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto",
+     "setembro", "outubro", "novembro", "dezembro"]
+  : ["Janvier", "Fevrier", "Mars", "Avril", "Mai", "Juin", "Juillet",
+     "Aout", "Septembre", "Octobre", "Novembre", "Decembre"];
 function majHorloge() {
   const d = new Date();
   const p = (n) => String(n).padStart(2, "0");
   $("vHeure").textContent = `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
   $("vDate").textContent =
-    `${JOURS[d.getDay()]} ${d.getDate()} ${MOIS[d.getMonth()]} ${d.getFullYear()}`;
+    PT ? `${JOURS[d.getDay()]}, ${d.getDate()} de ${MOIS[d.getMonth()]} de ${d.getFullYear()}`
+       : `${JOURS[d.getDay()]} ${d.getDate()} ${MOIS[d.getMonth()]} ${d.getFullYear()}`;
 }
 
 // ------------------------------------------------------------- evenements
@@ -820,8 +865,34 @@ function appliquer(ev) {
     case "demo":
       $("badgeDemo").style.display = ev.v ? "block" : "none";
       break;
+    case "chat":
+      document.body.classList.toggle("chat-aberto", !!ev.v);
+      $("chat").setAttribute("aria-hidden", ev.v ? "false" : "true");
+      if (ev.v) setTimeout(() => $("entreeChat").focus(), 50);
+      break;
   }
 }
+
+// ------------------------------------------------------------- chat (ouvert a la voix)
+
+$("fecharChat").addEventListener("click", () => {
+  appliquer({t: "chat", v: false});
+  fetch("/api/chat", {method: "POST", headers: {"Content-Type": "application/json", "X-Jarvis-HUD": "1"},
+    body: JSON.stringify({fechar: true})}).catch(() => {});
+});
+$("formChat").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const champ = $("entreeChat"), texte = champ.value.trim();
+  if (!texte) return;
+  champ.value = "";
+  try {
+    const rep = await fetch("/api/chat", {method: "POST",
+      headers: {"Content-Type": "application/json", "X-Jarvis-HUD": "1"},
+      body: JSON.stringify({texte})});
+    if (!rep.ok) { const d = await rep.json().catch(() => ({})); champ.value = texte;
+      champ.placeholder = d.message || "Erreur"; }
+  } catch (_) { champ.value = texte; }
+});
 
 // ------------------------------------------------------------- connexion SSE
 

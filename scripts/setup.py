@@ -238,11 +238,19 @@ def main():
         print("  2) local  — Ollama nativo + Piper (100% offline, GPU recomendado)")
         choix = demander("Sua escolha (1/2)", "1")
         (config_local if choix.strip() == "2" else config_cloud)(conf)
+        # Le panneau (chaves, modelos, voz) precisa do servidor web local.
+        conf.setdefault("serveur", {})["actif"] = True
         ecrire_config(conf)
 
     detecter_materiel()
     tester_integrations()
     test_micro_et_bienvenue()
+    if oui("\nIniciar o Jarvis automaticamente quando o computador ligar?", True):
+        try:
+            from core import autostart
+            print("  " + autostart.configurer(True)["message"])
+        except Exception as e:
+            print(f"  (não foi possível ativar o início automático: {e})")
 
     dire_titre("Termine !")
     print("Lance Jarvis :  double-clic sur lancer_jarvis.bat, ou  uv run python jarvis14.py")

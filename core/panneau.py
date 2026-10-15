@@ -492,6 +492,7 @@ _CLES_REGLABLES = {
     "assistant.seuil_reveil": "float", "tts.moteur": "str",
     "elevenlabs.voix": "str", "elevenlabs.modele": "str",
     "assistant.langue": "str",
+    "assistant.instructions": "str",
 }
 
 
@@ -552,6 +553,7 @@ def _reglages():
         "entrees": entrees, "sorties": sorties,
         "personnalites": ["jarvis_sarcastique", "neutre", "concis"],
         "langue": reglage("assistant.langue", "fr"),
+        "instructions": reglage("assistant.instructions", "") or "",
     }
 
 
@@ -574,6 +576,12 @@ def _definir_reglage(cle, valeur):
             if not definir_mode(str(valeur), raison="panneau"):
                 return {"ok": False, "message": "Mode invalide."}
             return {"ok": True, "message": f"Mode {valeur} actif immediatement."}
+        if cle == "assistant.instructions":
+            valeur = valeur.strip()
+            if len(valeur) > 3000:
+                return {"ok": False, "message": "Máximo de 3000 caracteres."}
+            definir(cle, valeur)
+            return {"ok": True, "message": "Prompt comportamental salvo; vale na próxima frase."}
         if cle == "assistant.langue":
             if valeur not in {"fr", "pt"}:
                 return {"ok": False, "message": "Langue invalide."}
@@ -1112,6 +1120,22 @@ def monter_routes(app):
         d = await _corps(request)
         return provedores.activer(str(d.get("id", "")), d.get("modelo", ""),
                                   str(d.get("perfil", "hybride")))
+
+    # -- demarrage automatique (LOCAL uniquement : installe un service/une tache) --
+    @app.get("/api/panneau/autostart")
+    def api_autostart(request: Request):
+        if (r := garde(request, local=True)):
+            return r
+        from core import autostart
+        return autostart.etat()
+
+    @app.post("/api/panneau/autostart")
+    async def api_autostart_definir(request: Request):
+        if (r := garde(request, local=True)):
+            return r
+        from core import autostart
+        d = await _corps(request)
+        return autostart.configurer(bool(d.get("ativar")), str(d.get("modo", "completo")))
 
     # -- favoris et repli (fallback) --
     @app.post("/api/panneau/provedores/favorito")

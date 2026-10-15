@@ -124,6 +124,8 @@ assistant:
   piece_nuit: "chambre"        # piece allumee au demarrage s'il fait nuit ("" pour desactiver)
   langue: fr                   # fr = francais (defaut) | pt = portugais du Bresil (voix, transcription,
                                # reponses, confirmations « sim/nao ») ; a la voix : « fale em portugues »
+  instructions: ""             # prompt comportamental (painel > Ajustes) : ton, contexte, preferencias ;
+                               # ne leve jamais les confirmations N2/N3
   personnalite: "jarvis_sarcastique"   # jarvis_sarcastique | neutre | concis
                                # (modifiable a la voix : "passe en mode neutre")
   scene_extinction: "off"      # scene lumieres jouee AVANT d'eteindre le PC ("eteins le PC")
