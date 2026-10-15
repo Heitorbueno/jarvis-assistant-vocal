@@ -77,8 +77,12 @@ def traiter_commande(phrase):
     P = llm()
     if not P.disponible():
         return {"ok": False, "reponse": "Le modele de Jarvis n'est pas disponible."}
+    from core import langue
     systeme = ("Tu es Jarvis, pilote a distance. Execute la commande de l'utilisateur "
-               "via les outils. Reponds en UNE phrase tres courte, en francais.")
+               "via les outils. Reponds en UNE phrase tres courte"
+               + (", en francais." if not langue.est_pt() else ".")
+               + " Si l'action demandee n'est pas disponible a distance, dis-le simplement."
+               + langue.consigne_systeme())
     messages = [{"role": "user", "content": phrase}]
     faits = []
     for _ in range(4):

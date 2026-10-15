@@ -127,3 +127,18 @@ use a chave que começa com `sk_`, exibida só ao criar/rotacionar.
   - *Logs*: últimas linhas de `logs/*.log`, com chaves e tokens mascarados.
 - **Conversa**: últimas falas entre você e o Jarvis (também no acesso remoto
   autenticado); nada é gravado em disco.
+
+## 9. Falar com o Jarvis pelo celular (PWA) — chat oculto
+
+- Botão 🎤 no canto do painel/PWA: toque, fale, toque de novo (máx. 15 s). O áudio
+  é transcrito pelo Whisper do PC e a resposta volta em texto e **em voz no próprio
+  aparelho** (se houver voz configurada).
+- O **chat de texto fica oculto**: só abre quando você diz « abre o chat » (e fecha
+  com « fecha o chat » ou ×).
+- Regra de acesso a distância (inalterada): executa só ferramentas seguras (N1
+  expostas e a domótica liberada em `pont_iphone.domotique_distante`). Ações N2/N3
+  (lançar conta, e-mail, ligação, desligar…) são recusadas: « faça pela voz em casa ».
+- Gravar áudio exige contexto seguro: `http://127.0.0.1` no PC ou HTTPS (Tailscale,
+  Cloudflare). Limite de 20 comandos por minuto.
+- Corrigido: no celular o painel ficava mais largo que a tela (tabelas das abas
+  Modelos e Permissões); agora elas rolam dentro do card.

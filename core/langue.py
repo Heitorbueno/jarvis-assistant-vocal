@@ -195,6 +195,13 @@ _EXACTES = {
         "Nenhuma chave de API configurada para este provedor. Adicione no painel.",
     "je regarde les cotations.": "Vou ver as cotações.",
     "je regarde les actualites.": "Vou ver as notícias.",
+    "le modele de jarvis n'est pas disponible.": "O modelo do Jarvis não está disponível.",
+    "action critique : a faire a la voix a la maison (refusee a distance).":
+        "Ação crítica: faça pela voz em casa (recusada a distância).",
+    "action sensible : a faire a la voix a la maison (refusee a distance).":
+        "Ação sensível: faça pela voz em casa (recusada a distância).",
+    "commande trop longue a traiter.": "Comando longo demais para processar.",
+    "rien a faire.": "Nada a fazer.",
     "test de la voix jarvis. la voix selectionnee est active.":
         "Teste da voz do Jarvis. A voz selecionada está ativa.",
 }

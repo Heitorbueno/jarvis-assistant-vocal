@@ -1137,6 +1137,23 @@ def monter_routes(app):
         d = await _corps(request)
         return autostart.configurer(bool(d.get("ativar")), str(d.get("modo", "completo")))
 
+    # -- comandos de voz / chat oculto pelo painel-PWA (regras de acesso a distancia) --
+    @app.post("/api/panneau/comando/voz")
+    async def api_cmd_voz(request: Request):
+        if (r := garde(request)):
+            return r
+        from core import comando_remoto
+        d = await _corps(request)
+        return comando_remoto.comando_voz(d.get("audio", ""), str(d.get("mime", "audio/webm")),
+                                          bool(d.get("voz", True)))
+
+    @app.post("/api/panneau/comando/texto")
+    async def api_cmd_texte(request: Request):
+        if (r := garde(request)):
+            return r
+        from core import comando_remoto
+        return comando_remoto.comando_texto(str((await _corps(request)).get("texto", "")))
+
     # -- manutencao : atualizar, backup, diagnostico, logs (LOCAL) ; checklist et historique --
     @app.get("/api/panneau/primeiros-passos")
     def api_checklist(request: Request):
