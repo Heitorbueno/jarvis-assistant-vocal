@@ -42,9 +42,9 @@ def _executer(cmd, timeout=60):
 # ============================================================ Windows
 
 def _windows_etat():
-    startup = Path(os.environ.get("APPDATA", "")) / "Microsoft" / "Windows" / "Start Menu" \
-        / "Programs" / "Startup" / f"{NOM}.cmd"
-    if startup.exists():
+    pasta = Path(os.environ.get("APPDATA", "")) / "Microsoft" / "Windows" / "Start Menu" \
+        / "Programs" / "Startup"
+    if (pasta / f"{NOM}.lnk").exists() or (pasta / f"{NOM}.cmd").exists():
         return {"ativo": True, "metodo": "pasta Inicializar"}
     code, _ = _executer(["schtasks", "/Query", "/TN", NOM], timeout=15)
     return {"ativo": code == 0, "metodo": "tarefa agendada" if code == 0 else ""}
@@ -133,6 +133,16 @@ def _linux(installer, mode):
                 return {"ok": False, "message": f"Não foi possível remover {c}: {e}"}
             _systemctl(m, "daemon-reload")
     return {"ok": True, "message": "Início automático desativado."}
+
+
+def criar_atalhos():
+    """Windows : atalhos que iniciam o Jarvis sem prompt + link jarvis:// para o PWA."""
+    if sys.platform != "win32":
+        return {"ok": False, "message": "Atalhos disponíveis no Windows."}
+    code, sortie = _executer(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File",
+                              str(RACINE / "scripts" / "criar_atalhos.ps1")], timeout=60)
+    return {"ok": code == 0, "message": "Atalhos « Jarvis » e « Jarvis Painel » criados; o PWA "
+            "já consegue iniciar o Jarvis." if code == 0 else f"Falha ({code}): {sortie[-200:]}"}
 
 
 # ============================================================ API

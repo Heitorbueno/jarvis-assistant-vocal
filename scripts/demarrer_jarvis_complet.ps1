@@ -18,6 +18,21 @@ function WaitPort($port, $timeout = 40) {
 
 Log "=== autostart ==="
 
+# 0) Jarvis vocal PRIMEIRO, sem janela de prompt (abrir_jarvis.ps1 nao duplica).
+#    Antes ele so abria depois do MCP e de ate 2 min de tentativas do tunel Hermes.
+& (Join-Path $PSScriptRoot "abrir_jarvis.ps1") -Alvo iniciar
+Log "Jarvis vocal solicitado"
+
+# Hermes so se estiver configurado (hermes.api_key preenchida no config.yaml).
+$cfg = Join-Path $jarvis "config.yaml"
+$hermesAtivo = $false
+if (Test-Path $cfg) {
+  $txt = Get-Content $cfg -Raw -Encoding UTF8
+  $m = [regex]::Match($txt, '(?ms)^hermes:\s*\r?\n(.*?)(?=^\S|\z)')
+  if ($m.Success -and $m.Groups[1].Value -match 'api_key:\s*[''"]?[A-Za-z0-9_\-]{6,}') { $hermesAtivo = $true }
+}
+if (-not $hermesAtivo) { Log "Hermes nao configurado : MCP/tunel ignorados"; Log "=== fait ==="; exit 0 }
+
 # uv est utilise par le MCP et par Jarvis vocal.
 $uv = "$env:USERPROFILE\.local\bin\uv.exe"
 if (-not (Test-Path $uv)) { $uv = "uv" }
@@ -64,14 +79,5 @@ if ($mcpUp -and (Test-Path $tunnel)) {
   Log "script de tunnel Hermes absent"
 }
 
-# 3) Jarvis vocal — ANTI-DOUBLON : ne lance que s'il ne tourne pas déjà.
-$deja = Get-CimInstance Win32_Process -Filter "Name='python.exe' OR Name='pythonw.exe'" |
-        Where-Object { $_.CommandLine -match 'jarvis14\.py' }
-if ($deja) {
-  Log "Jarvis vocal déjà lancé (PID $($deja.ProcessId -join ', ')) -> rien à faire"
-} else {
-  Log "lancement du Jarvis vocal via $uv"
-  Start-Process $uv -ArgumentList "run","python","jarvis14.py" `
-    -WorkingDirectory $jarvis -WindowStyle Minimized
-}
+# 3) Jarvis vocal : ja iniciado no passo 0.
 Log "=== fait ==="

@@ -2,15 +2,37 @@
 <html lang="pt-BR"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#0f1115">
-<title>Jarvis — offline</title>
+<title>Jarvis — iniciando</title>
 <style>
 body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;
 background:#0f1115;color:#e6e8ec;font:15px/1.5 -apple-system,Segoe UI,Roboto,sans-serif;padding:16px;text-align:center}
-img{width:96px;height:96px;border-radius:22px}p{color:#9aa2b1;max-width:320px}
-button{background:#5b8cff;color:#fff;border:0;border-radius:10px;padding:10px 18px;font-size:15px}
+img{width:96px;height:96px;border-radius:22px}p{color:#9aa2b1;max-width:360px;margin:8px auto}
+a.b,button{display:inline-block;background:#5b8cff;color:#fff;border:0;border-radius:10px;padding:11px 20px;font-size:15px;
+text-decoration:none;cursor:pointer;margin:6px}
+.g{background:transparent;border:1px solid #2a2f3a;color:#e6e8ec}
+#st{font-size:13px;color:#9aa2b1;min-height:20px}
 </style></head><body><div>
 <img src="/pwa/icone-192.png" alt="">
-<h1 style="font-size:18px">Jarvis inacessível</h1>
-<p>O PC do Jarvis está desligado, sem rede, ou o túnel (Tailscale/Cloudflare) não está ativo.</p>
-<button onclick="location.reload()">Tentar novamente</button>
-</div></body></html>
+<h1 style="font-size:19px;margin:12px 0 4px">O Jarvis não está rodando</h1>
+<p id="local">Clique em <b>Iniciar Jarvis</b>: ele abre em segundo plano, sem prompt. Esta página recarrega sozinha quando ele estiver pronto.</p>
+<p id="remoto" style="display:none">O PC do Jarvis está desligado, sem rede ou o túnel (Tailscale/Cloudflare) está parado.</p>
+<div><a class="b" id="iniciar" href="jarvis://iniciar">Iniciar Jarvis</a>
+<button class="g" onclick="location.reload()">Tentar de novo</button></div>
+<div id="st"></div>
+<p style="font-size:12px">Primeira vez? Se o botão não fizer nada, rode uma vez <b>scripts\criar_atalhos.ps1</b>
+(ou ative « Iniciar com o computador » no painel) e permita abrir o link « jarvis ».</p>
+</div>
+<script>
+const local=['127.0.0.1','localhost','[::1]'].includes(location.hostname);
+if(!local){document.getElementById('local').style.display='none';document.getElementById('iniciar').style.display='none';
+  document.getElementById('remoto').style.display='';}
+let n=0;
+async function verificar(){
+  n++; document.getElementById('st').textContent=n>1?'Aguardando o Jarvis…':'';
+  try{const r=await fetch('/manifest.webmanifest',{cache:'no-store'});if(r.ok){location.reload();return}}catch(_){}
+  setTimeout(verificar,2500);
+}
+document.getElementById('iniciar').addEventListener('click',()=>{n=1;setTimeout(verificar,2500)});
+setTimeout(verificar,4000);
+</script>
+</body></html>

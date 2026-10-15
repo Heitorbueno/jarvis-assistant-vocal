@@ -15,7 +15,7 @@ try {
   $action = New-ScheduledTaskAction -Execute "powershell.exe" `
     -Argument "-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$script`""
   $trigger = New-ScheduledTaskTrigger -AtLogOn
-  $trigger.Delay = "PT30S"
+  $trigger.Delay = "PT10S"
   $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries `
     -DontStopIfGoingOnBatteries -StartWhenAvailable -ExecutionTimeLimit ([TimeSpan]::Zero)
   Register-ScheduledTask -TaskName $nom -Action $action -Trigger $trigger `
@@ -26,26 +26,32 @@ try {
   $tacheOk = $false
 }
 
+# Atalhos + link jarvis:// (o PWA consegue iniciar o Jarvis quando ele estiver desligado).
+try { & (Join-Path $PSScriptRoot "criar_atalhos.ps1") | Out-Null } catch {}
+
 if ($tacheOk) {
   Write-Host "OK : tâche planifiée « $nom » installée (login + 30 s)." -ForegroundColor Green
   Write-Host "Tester : Start-ScheduledTask -TaskName $nom"
   exit 0
 }
 
-# --- 2) Repli SANS admin : dossier Démarrage ---
-Write-Host "Tâche planifiée refusée (pas d'admin) -> repli dossier Démarrage." -ForegroundColor Yellow
+# --- 2) Repli SANS admin : atalho OCULTO na pasta Inicializar (sem janela de prompt) ---
+Write-Host "Tâche planifiée refusée (pas d'admin) -> atalho na pasta Inicializar." -ForegroundColor Yellow
 $startup = [Environment]::GetFolderPath('Startup')
-$cmd = Join-Path $startup "JarvisAutostart.cmd"
-@(
-  '@echo off',
-  'rem Demarrage auto de Jarvis (sans admin) : delai reseau puis wrapper idempotent.',
-  'timeout /t 30 /nobreak >nul',
-  ('powershell -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "' + $script + '"')
-) | Set-Content -Encoding ascii $cmd
-if (Test-Path $cmd) {
-  Write-Host "OK : lancement au démarrage installé (dossier Démarrage, sans admin)." -ForegroundColor Green
-  Write-Host "  -> $cmd"
-  Write-Host "Tester maintenant : & `"$script`""
+$antigo = Join-Path $startup "JarvisAutostart.cmd"
+if (Test-Path $antigo) { Remove-Item $antigo -Force }      # versao antiga abria um prompt visivel
+$lnkPath = Join-Path $startup "JarvisAutostart.lnk"
+$sh = New-Object -ComObject WScript.Shell
+$lnk = $sh.CreateShortcut($lnkPath)
+$lnk.TargetPath = Join-Path $env:WINDIR "System32\wscript.exe"
+$lnk.Arguments = "`"$(Join-Path $PSScriptRoot 'abrir_jarvis.vbs')`" completo"
+$lnk.WorkingDirectory = Split-Path $PSScriptRoot -Parent
+$ico = Join-Path (Split-Path $PSScriptRoot -Parent) "web\pwa\favicon.ico"
+if (Test-Path $ico) { $lnk.IconLocation = $ico }
+$lnk.Save()
+if (Test-Path $lnkPath) {
+  Write-Host "OK : início automático instalado (pasta Inicializar, sem admin, sem janela)." -ForegroundColor Green
+  Write-Host "  -> $lnkPath"
 } else {
   Write-Host "ECHEC : impossible d'écrire dans le dossier Démarrage." -ForegroundColor Red
   exit 1

@@ -114,6 +114,7 @@
   <h1>Jarvis — Panneau de configuration</h1>
   <span id="pill-mode" class="pill local">local</span>
   <span id="hdr" class="muted" style="margin-left:auto;font-size:12px"></span>
+  <button id="btn-voltar" class="act ghost" onclick="voltarJarvis()" title="Voltar para a tela de conversa">◉ Voltar ao Jarvis</button>
   <button id="btn-instalar" class="act" style="display:none" onclick="instalarApp()">Instalar app</button>
   <select id="sel-langue" class="txt" style="min-width:0;width:auto" title="Idioma" onchange="mudarIdioma(this.value)">
     <option value="fr">FR</option><option value="pt">PT-BR</option>
@@ -174,7 +175,8 @@
           <select id="as-modo" class="txt"><option value="completo">Completo</option><option value="servidor">Servidor</option></select></div>
         <div class="row" style="margin-top:10px">
           <button class="act" onclick="asDefinir(true)">Ativar</button>
-          <button class="act danger" onclick="asDefinir(false)">Desativar</button></div>
+          <button class="act danger" onclick="asDefinir(false)">Desativar</button>
+          <button class="act ghost" onclick="criarAtalhos(this)">Criar atalhos (abre sem prompt)</button></div>
         <div class="msg" id="as-msg"></div>
       </div>
     </div>
@@ -353,9 +355,10 @@
             <select id="el-modelo" class="txt"><option value="">— modelo —</option></select>
             <button class="act" onclick="elSelecionar(false)">Salvar voz/modelo</button>
             <button class="act ghost" onclick="elSelecionar(true)">Salvar e usar ElevenLabs</button>
-            <button class="act ghost" onclick="testerVoix()">Ouvir teste no PC</button>
+            <button class="act ghost" onclick="testerVoixReal()">Ouvir teste no PC</button>
           </div>
           <div class="msg" id="el-msg"></div>
+          <div id="el-estado" style="margin-top:8px"></div>
           <small class="note">Link: <a href="https://elevenlabs.io/app/settings/api-keys" target="_blank" rel="noopener" style="color:var(--acc)">elevenlabs.io → API keys</a> (a chave precisa da permissão <i>Voices: read</i>; para clonar, <i>Voices: write</i>).</small>
         </div>
       </div>
@@ -819,6 +822,11 @@ async function setReglage(cle,valeur,cibleOuBtn){
   if(el) el.innerHTML=`<span style="color:var(--${r.ok?'ok':'ko'})">${esc(r.message||'')}</span>`;
   if(r.ok&&cle==='mode') setTimeout(chargerModeles,250);
 }
+async function testerVoixReal(){
+  const r=await post('/api/panneau/tester-voix',{}); elMsg(r); if(!r.ok)return;
+  await new Promise(o=>setTimeout(o,5000)); const e=await vozEstado();
+  if(e.motor) elMsg({ok:!!e.ok&&!String(e.motor).includes('fallback'),message:`Falou com: ${e.motor}${e.erro?' — '+e.erro:''}`});
+}
 async function testerVoix(){
   const r=await post('/api/panneau/tester-voix',{});
   $('#tts-msg').innerHTML=`<span style="color:var(--${r.ok?'ok':'ko'})">${esc(r.message||'')}</span>`;
@@ -876,6 +884,12 @@ async function chargerSession(){
   const dist=d.mode==='distant';
   const p=$('#pill-mode'); p.textContent=dist?'remoto (autenticado)':'local'; p.classList.toggle('local',!dist);
   $('#btn-sair').style.display=dist?'':'none';
+}
+async function voltarJarvis(){
+  if(!LOCALHOSTS.includes(location.hostname)){ $$('nav button[data-t]')[0].click(); return; }
+  const r=await post('/api/panneau/abrir-hud',{});
+  if(window.opener||history.length<=1){ try{window.close()}catch(_){} }
+  if(!r.ok) alert(r.message||'Não foi possível abrir o Jarvis.');
 }
 async function sair(){await post('/api/acesso/sair',{});location.replace('/acesso');}
 let PEDIDO_INSTALACAO=null;
@@ -1072,7 +1086,15 @@ async function ollamaIniciar(btn){
 /* ---------- ELEVENLABS ---------- */
 let EL={voix:[],modeles:[],etat:{}};
 const elMsg=r=>$('#el-msg').innerHTML=`<span style="color:var(--${r.ok?'ok':'ko'})">${esc(r.message||'')}</span>`;
+async function vozEstado(){
+  const e=await api('/api/panneau/voz/estado'), el=$('#el-estado'); if(!el)return e;
+  let h='';
+  if(e.problema_chave) h+=`<div class="lock" style="background:#3a1c1c;border-color:#5a2020;color:#ffb0b0">⚠ ${esc(e.problema_chave)}</div>`;
+  if(e.motor) h+=`<div class="muted" style="font-size:13px">Última fala: <b>${esc(e.motor)}</b>${e.erro?` — <span style="color:var(--ko)">${esc(e.erro)}</span>`:''}</div>`;
+  el.innerHTML=h; return e;
+}
 async function chargerEleven(){
+  vozEstado();
   EL.etat=await api('/api/panneau/elevenlabs');
   $('#el-badge').innerHTML=EL.etat.configure?bYes('chave '+EL.etat.cle_masquee):bNo('sem chave');
   if(!EL.etat.configure){EL.voix=[];EL.modeles=[];}
@@ -1187,6 +1209,7 @@ async function chargerAutostart(){
   $('#as-modo-linha').style.display=String(d.sistema||'').startsWith('linux')?'':'none';
   if(d.modo) $('#as-modo').value=d.modo;
 }
+async function criarAtalhos(btn){btn.disabled=true;fl('as-msg',await post('/api/panneau/atalhos',{}));btn.disabled=false;}
 async function asDefinir(ativar){
   fl('as-msg',{ok:true,message:'Aplicando…'});
   fl('as-msg',await post('/api/panneau/autostart',{ativar,modo:$('#as-modo').value})); chargerAutostart();

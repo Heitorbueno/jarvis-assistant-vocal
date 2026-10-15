@@ -6,6 +6,18 @@ Toutes les évolutions notables de Jarvis. Format inspiré de
 
 ## [Unreleased] — 2026-10-14
 
+### Corrigé (retours terrain Windows)
+- pt-BR : prompt système de base entièrement en portugais (`SYSTEME_BASE_PT`),
+  reconstruit au changement de langue, filet de traduction si la réponse sort en français.
+- « Oi Jarvis » seul : Jarvis répond « Pois não? » et réécoute au lieu de se taire.
+- ElevenLabs : clé ID (64 hex) détectée et expliquée ; repli Piper puis SAPI signalé
+  dans le panneau ; erreurs de clonage traduites (plan, permissions, limite).
+- Instance unique (verrou socket) : un second lancement ramène la fenêtre.
+- Lancement sans invite : `scripts/abrir_jarvis.vbs/.ps1`, raccourcis Bureau/Menu,
+  protocole `jarvis://`, démarrage auto via raccourci caché ; page hors-ligne PWA
+  avec bouton « Iniciar Jarvis ».
+- Panneau : bouton « Voltar ao Jarvis » et « Criar atalhos ».
+
 ### Ajouté
 - Accès distant authentifié au panneau (Tailscale Serve, Cloudflare Tunnel,
   proxy HTTPS) : hôtes déclarés, code d'accès PBKDF2, session HMAC, opt-in

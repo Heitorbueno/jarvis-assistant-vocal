@@ -176,7 +176,20 @@ def cloner_elevenlabs(nom, fichiers, description="", utiliser=True, retirer_brui
         return {"ok": False, "message": f"ElevenLabs inacessível ({type(e).__name__})."}
     if r.status_code != 200:
         from core.provedores import _erreur_http
-        return {"ok": False, "message": _erreur_http(r)}
+        try:
+            status = str(((r.json() or {}).get("detail") or {}).get("status", ""))
+        except Exception:
+            status = ""
+        explicacoes = {
+            "api_key_id_used_as_api_key": "A chave salva é o ID da chave. Cole a chave que começa com sk_.",
+            "invalid_api_key": "Chave da ElevenLabs inválida.",
+            "can_not_use_instant_voice_cloning": "Seu plano da ElevenLabs não permite clonar voz "
+                                                 "(precisa do plano Starter ou superior).",
+            "missing_permissions": "A chave não tem permissão « Voices: write ». Crie uma chave com "
+                                   "essa permissão na ElevenLabs.",
+            "voice_limit_reached": "Limite de vozes da sua conta atingido. Apague uma voz na ElevenLabs.",
+        }
+        return {"ok": False, "message": explicacoes.get(status) or _erreur_http(r)}
     voix_id = str((r.json() or {}).get("voice_id", ""))
     if not voix_id:
         return {"ok": False, "message": "A ElevenLabs não devolveu o ID da voz."}

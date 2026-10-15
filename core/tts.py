@@ -34,6 +34,25 @@ from core.config import reglage
 LOG = logging.getLogger("jarvis")
 _RACINE = Path(__file__).resolve().parent.parent
 
+# Ultimo resultado da sintese (mostrado no painel) : qual motor falou e por que caiu.
+ESTADO = {"motor": "", "ok": None, "erro": "", "ts": 0.0}
+
+
+def _registrar(motor, ok, erro=""):
+    import time
+    ESTADO.update(motor=motor, ok=bool(ok), erro=str(erro or "")[:300], ts=time.time())
+
+
+def diagnostico_chave_eleven():
+    """'' se a chave parece valida ; senao a explicacao (ID da chave em vez da chave)."""
+    cle = str(reglage("elevenlabs.cle", "") or "").strip()
+    if not cle:
+        return "Nenhuma chave da ElevenLabs salva."
+    if not cle.startswith("sk_"):
+        return ("A chave salva é o ID da chave, não a chave. Na ElevenLabs, crie ou rotacione "
+                "a chave e cole o valor que começa com sk_ (painel › ElevenLabs).")
+    return ""
+
 
 class ProviderTTS:
     nom = "?"
@@ -128,6 +147,7 @@ class ElevenLabsProvider(ProviderTTS):
                 budget.enregistrer_tts(len(texte or ""))
             except Exception:
                 pass
+            _registrar("ElevenLabs", True)
             return np.frombuffer(donnees, dtype=np.int16), 24000
         except Exception as e:
             detail = ""
@@ -135,11 +155,17 @@ class ElevenLabsProvider(ProviderTTS):
                 detail = e.read().decode("utf-8", "ignore")[:300]   # HTTPError : cause precise
             except Exception:
                 pass
-            if "api_key_id_used_as_api_key" in detail:
-                print("  [ElevenLabs] la cle configuree est l'ID de la cle, pas la cle (sk_...). "
-                      "Corrige-la dans le panneau, onglet ElevenLabs.")
+            if "api_key_id_used_as_api_key" in detail or "invalid_api_key" in detail:
+                motivo = diagnostico_chave_eleven() or "Chave da ElevenLabs recusada."
+            elif "quota_exceeded" in detail:
+                motivo = "Créditos da ElevenLabs esgotados neste mês."
+            elif "voice_not_found" in detail:
+                motivo = "A voz escolhida não existe nesta conta. Escolha outra no painel."
             else:
-                print(f"  [ElevenLabs] indisponible ({e}) {detail[:160]}, repli voix Windows.")
+                motivo = f"ElevenLabs indisponível ({type(e).__name__}) {detail[:160]}"
+            print(f"  [ElevenLabs] {motivo} Repli voix Windows.")
+            LOG.warning("ElevenLabs : %s", motivo)
+            _registrar("Windows (fallback)", False, motivo)
             return None
 
 
@@ -292,7 +318,15 @@ def tts():
         else:
             if moteur == "auto":
                 moteur = "elevenlabs"
-        if moteur == "elevenlabs":
+        if moteur == "elevenlabs" and diagnostico_chave_eleven():
+            # Chave ausente ou ID da chave : a API recusaria TODAS as frases (atraso + voz
+            # robotica). Usa a voz local Piper se houver, senao a do Windows, e avisa no painel.
+            motivo = diagnostico_chave_eleven()
+            piper = PiperProvider()
+            _TTS = piper if piper.disponible() else WindowsProvider()
+            _registrar(f"{_TTS.nom} (ElevenLabs desativado)", False, motivo)
+            LOG.warning("ElevenLabs ignore : %s", motivo)
+        elif moteur == "elevenlabs":
             _TTS = ElevenLabsProvider()
         elif moteur == "kokoro":
             _TTS = KokoroProvider()

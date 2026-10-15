@@ -1029,6 +1029,9 @@ def monter_routes(app):
                 target=voix.parler,
                 args=("Test de la voix Jarvis. La voix selectionnee est active.",),
                 daemon=True, name="test-voix").start()
+            if voix._parleur is None:
+                return {"ok": False, "message": "O Jarvis vocal não está rodando neste processo "
+                        "(inicie o Jarvis para ouvir o teste)."}
             return {"ok": True, "message": "Test vocal lance."}
         except Exception as e:
             LOG.exception("test voix panneau")
@@ -1136,6 +1139,16 @@ def monter_routes(app):
         from core import autostart
         d = await _corps(request)
         return autostart.configurer(bool(d.get("ativar")), str(d.get("modo", "completo")))
+
+    # -- estado real da voz (qual motor falou, por que caiu) --
+    @app.get("/api/panneau/voz/estado")
+    def api_voix_etat(request: Request):
+        if (r := garde(request)):
+            return r
+        from core import tts
+        return {**tts.ESTADO, "motor_configurado": str(reglage("tts.moteur", "auto") or "auto"),
+                "problema_chave": tts.diagnostico_chave_eleven()
+                if str(reglage("tts.moteur", "auto")) in ("auto", "elevenlabs") else ""}
 
     # -- configuracoes (todas as integracoes do config.yaml) --
     @app.get("/api/panneau/configuracoes")
@@ -1374,6 +1387,29 @@ def monter_routes(app):
         from core import mcp_cliente
         d = await _corps(request)
         return mcp_cliente.definir_n1(str(d.get("nome", "")), d.get("leitura") or [])
+
+    @app.post("/api/panneau/atalhos")
+    def api_atalhos(request: Request):
+        if (r := garde(request, local=True)):
+            return r
+        from core import autostart
+        return autostart.criar_atalhos()
+
+    @app.post("/api/panneau/abrir-hud")
+    def api_abrir_hud(request: Request):
+        """Volta para a tela principal (reator) : traz a janela do HUD para frente."""
+        if (r := garde(request, local=True)):
+            return r
+        import sys as _sys
+        h = _sys.modules.get("hud")
+        if h is None:
+            return {"ok": False, "message": "O Jarvis vocal não está rodando."}
+        try:
+            if not h.mettre_au_premier_plan():
+                h.ouvrir_fenetre()
+        except Exception:
+            h.ouvrir_fenetre()
+        return {"ok": True}
 
     # -- favoris et repli (fallback) --
     @app.post("/api/panneau/provedores/favorito")

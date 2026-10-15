@@ -13,7 +13,7 @@ import json
 from pathlib import Path
 
 _DOSSIER = Path(__file__).resolve().parent.parent / "web" / "pwa"
-VERSION = "jarvis-pwa-v1"
+VERSION = "jarvis-pwa-v2"
 
 MANIFESTE = {
     "id": "/panneau",
@@ -68,6 +68,7 @@ _FICHIERS = {
     "icone-maskable-512.png": "image/png",
     "apple-touch-icon.png": "image/png",
     "favicon.png": "image/png",
+    "favicon.ico": "image/x-icon",
     "hors-ligne.html": "text/html; charset=utf-8",
     "i18n.js": "application/javascript; charset=utf-8",
 }

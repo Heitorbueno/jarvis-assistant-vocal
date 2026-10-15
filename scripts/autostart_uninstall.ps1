@@ -14,12 +14,14 @@ if (Get-ScheduledTask -TaskName $nom -ErrorAction SilentlyContinue) {
   }
 }
 
-# 2) Raccourci du dossier Démarrage (si présent).
-$cmd = Join-Path ([Environment]::GetFolderPath('Startup')) "JarvisAutostart.cmd"
-if (Test-Path $cmd) {
-  Remove-Item $cmd -Force
-  Write-Host "OK : lancement au démarrage retiré ($cmd)." -ForegroundColor Green
-  $retire = $true
+# 2) Raccourci du dossier Démarrage (si présent) : .lnk actuel et ancien .cmd.
+foreach ($nomFichier in @("JarvisAutostart.lnk", "JarvisAutostart.cmd")) {
+  $cmd = Join-Path ([Environment]::GetFolderPath('Startup')) $nomFichier
+  if (Test-Path $cmd) {
+    Remove-Item $cmd -Force
+    Write-Host "OK : lancement au démarrage retiré ($cmd)." -ForegroundColor Green
+    $retire = $true
+  }
 }
 
 if (-not $retire) { Write-Host "Rien à retirer (aucun démarrage auto installé)." }

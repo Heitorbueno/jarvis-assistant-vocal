@@ -202,6 +202,9 @@ _EXACTES = {
         "Ação sensível: faça pela voz em casa (recusada a distância).",
     "commande trop longue a traiter.": "Comando longo demais para processar.",
     "rien a faire.": "Nada a fazer.",
+    "test de la voix jarvis. tout fonctionne.": "Teste da voz do Jarvis. Tudo funcionando.",
+    "d'accord, je me mets en veille.": "Certo, vou ficar em espera.",
+    "le minuteur est termine.": "O timer terminou.",
     "test de la voix jarvis. la voix selectionnee est active.":
         "Teste da voz do Jarvis. A voz selecionada está ativa.",
 }
@@ -252,6 +255,7 @@ _MOTIFS = [
      r"lancer (.+)\.",
      "Acabei de ler um conteúdo externo. Por precaução, peço sua autorização antes de executar {1}."),
     (r"je vais executer (.+)\.", "Vou executar {1}."),
+    (r"le minuteur (.+) est termine\.", "O timer {1} terminou."),
     (r"plafond de budget atteint pour (aujourd'hui|ce mois)\. je bascule en local, gratuit : ollama "
      r"et piper\. je mets aussi en pause les taches de fond d'hermes non critiques jusqu'a demain\. "
      r"dis « repasse en cloud » si tu veux forcer\.",
@@ -314,3 +318,55 @@ def localiser(texte):
     if trad is None:
         trad = reste
     return (trad + "".join(suffixes)) if suffixes or trad != reste else texte
+
+
+# ================================================================ rede de seguranca : traducao
+
+_MARCAS_FR = {"le", "la", "les", "est", "tu", "je", "des", "une", "pour", "avec", "il", "fait",
+              "degres", "aujourd", "ton", "tes", "mes", "nouveaux", "vous", "pas", "sur", "dans",
+              "bonjour", "bonsoir", "minuteur", "termine", "aucun", "aucune", "mail", "reunion"}
+_MARCAS_PT = {"o", "os", "você", "voce", "não", "nao", "uma", "com", "para", "está", "esta",
+              "seu", "sua", "hoje", "graus", "bom", "boa", "que", "são", "sao", "também"}
+_CACHE_TRAD = {}
+
+
+def parece_frances(texto):
+    palavras = re.findall(r"[a-zàâçéèêëîïôûùüÿœ']+", str(texto).lower())
+    if len(palavras) < 3:
+        return False
+    fr = sum(1 for p in palavras if p.split("'")[-1] in _MARCAS_FR or p.startswith(("l'", "d'", "j'", "qu'", "n'", "c'")))
+    pt = sum(1 for p in palavras if p in _MARCAS_PT)
+    return fr >= 2 and fr > pt
+
+
+def traduzir_para_pt(texto, timeout=15.0):
+    """Traduz para o português um texto ainda em francês (resumo do dia, timer, Hermes,
+    resultado bruto de ferramenta lido sem passar pelo modelo). Usa o mesmo modelo
+    configurado ; em caso de falha devolve o original (nunca bloqueia a fala)."""
+    if not est_pt() or not texto or not parece_frances(texto):
+        return texto
+    chave = texto.strip()
+    if chave in _CACHE_TRAD:
+        return _CACHE_TRAD[chave]
+    try:
+        import concurrent.futures
+        from core.llm import llm
+
+        def chamar():
+            p = llm()
+            rep = p.repondre(
+                "Traduza o texto do usuário para o português do Brasil, natural e falado. "
+                "Mantenha nomes próprios, números e valores. Responda SOMENTE com a tradução.",
+                [{"role": "user", "content": chave[:4000]}], [])
+            return " ".join(getattr(b, "text", "") or "" for b in rep.content
+                            if getattr(b, "type", None) == "text").strip()
+        with concurrent.futures.ThreadPoolExecutor(1) as ex:
+            traducao = ex.submit(chamar).result(timeout=timeout)
+    except Exception:
+        return texto
+    if traducao:
+        if len(_CACHE_TRAD) > 200:
+            _CACHE_TRAD.clear()
+        _CACHE_TRAD[chave] = traducao
+        return traducao
+    return texto

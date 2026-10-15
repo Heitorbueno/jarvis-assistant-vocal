@@ -341,7 +341,9 @@ def _appliquer_controle(donnees):
         from core import voix
         threading.Thread(
             target=voix.parler,
-            args=("Test de la voix Jarvis. Tout fonctionne.",),
+            args=(("Teste da voz do Jarvis. Tudo funcionando."
+                   if __import__("core.langue", fromlist=["est_pt"]).est_pt()
+                   else "Test de la voix Jarvis. Tout fonctionne."),),
             daemon=True,
             name="hud-test-voix",
         ).start()
