@@ -96,6 +96,7 @@
   <button data-t="provedores">Provedores IA</button>
   <button data-t="eleven">ElevenLabs</button>
   <button data-t="vozlocal">Voz local</button>
+  <button onclick="location.href='/financeiro'">Financeiro ↗</button>
   <button data-t="widgets">Widgets</button>
   <button data-t="integracoes">Integrações</button>
   <button data-t="remoto">Acesso remoto</button>
@@ -469,8 +470,8 @@ const post=(u,b)=>api(u,{method:'POST',headers:{'Content-Type':'application/json
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const bYes=(t)=>`<span class="badge on">${esc(t)}</span>`, bNo=(t)=>`<span class="badge off">${esc(t)}</span>`;
 
-$$('nav button').forEach(b=>b.onclick=()=>{
-  $$('nav button').forEach(x=>x.classList.toggle('on',x===b));
+$$('nav button[data-t]').forEach(b=>b.onclick=()=>{
+  $$('nav button[data-t]').forEach(x=>x.classList.toggle('on',x===b));
   $$('.tab').forEach(t=>t.classList.toggle('on',t.id===b.dataset.t));
   if(b.dataset.t==='etat'){chargerEtat();chargerBudget();chargerActivite();chargerTaches();} if(b.dataset.t==='perms')chargerPerms();
   if(b.dataset.t==='reglages'){chargerReglages();chargerAutostart();chargerInstrucoes();}

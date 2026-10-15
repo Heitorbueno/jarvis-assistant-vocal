@@ -72,6 +72,11 @@ def app():
         except Exception:
             LOG.exception("montage du cockpit")
         try:
+            from core.financeiro_web import monter_routes as monter_financeiro
+            monter_financeiro(_APP)               # /financeiro + /api/financeiro/* (LOCAL ; distant opt-in)
+        except Exception:
+            LOG.exception("montage du financeiro")
+        try:
             from tools.appel_direct import monter_ws
             monter_ws(_APP)                        # /stream (Twilio Media Streams)
         except Exception:

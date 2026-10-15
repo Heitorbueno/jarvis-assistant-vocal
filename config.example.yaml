@@ -516,6 +516,14 @@ alexa:                         # EXPERIMENTAL (via alexapy, non officiel) ; voir
   proxy_port: 3000             # port du proxy de connexion (scripts/alexa_login.py)
   routage_prioritaire: true    # commandes domotiques/routines -> Alexa avant le LLM (false = choix du LLM)
 
+financeiro:                    # modulo financeiro (/financeiro) : contas a pagar/receber, bancos, fluxo de caixa
+  banco: ""                    # vazio = finances/financeiro.db (local, nao versionado)
+  conta_padrao: ""             # nome da conta usada quando nenhuma e informada
+  pluggy:                      # Open Finance (opcional, somente leitura) : https://pluggy.ai
+    client_id: ""
+    client_secret: ""          # SECRET : definido pelo painel local, jamais exibido
+    itens: []                  # itemIds dos bancos conectados no Pluggy Connect
+
 widgets:                       # widgets do HUD (painel > Widgets) ; vazio = nenhum widget (HUD original)
   instalados: []               # ex. [{id: clima, coluna: direita}, {id: cambio, coluna: direita},
                                #      {id: bolsa, coluna: direita}, {id: noticias, coluna: esquerda}]

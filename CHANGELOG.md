@@ -26,6 +26,13 @@ Toutes les évolutions notables de Jarvis. Format inspiré de
 - Voix (`core/voix_gestion.py`) : réglages fins ElevenLabs, clonage par upload,
   voix Piper (catalogue, import, choix) et vitesse Piper/Kokoro.
 - Docs `docs/idioma_voz_modelos.md`, tests `tests/test_langue_voix_modeles.py`.
+- Démarrage automatique (Windows/systemd), chat HUD ouvert à la voix, prompt
+  comportemental, diagnostic des erreurs du modèle, fenêtre HUD unique.
+- Intégrations MCP (client) : GitHub, Git, Notion… avec confirmation N2 par défaut.
+- Widgets du HUD (météo, change, bourse, actualités, YouTube, Spotify, Netflix, Prime).
+- Module financier (`/financeiro`) : banques, contas a pagar/receber, récurrence,
+  parcelles, flux de trésorerie projeté, import OFX + rapprochement, Open Finance
+  (Pluggy, lecture seule), outils vocaux N2 (`docs/financeiro.md`).
 
 ### Modifié
 - Serveur unifié : `proxy_headers=False` (adresse de socket réelle vérifiée).

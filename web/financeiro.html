@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Jarvis — Financeiro</title>
+<style>
+  :root{--bg:#0f1115;--card:#171a21;--card2:#1d222b;--bord:#2a2f3a;--txt:#e6e8ec;--dim:#9aa2b1;
+    --acc:#5b8cff;--ok:#3ecf8e;--ko:#ff6b6b;--warn:#f5b942;--grid:#262b35}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);font:14px/1.5 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+  header{padding:16px 20px;padding-top:max(16px,env(safe-area-inset-top));border-bottom:1px solid var(--bord);
+    display:flex;align-items:center;gap:12px;position:sticky;top:0;background:var(--bg);z-index:5;flex-wrap:wrap}
+  header h1{font-size:16px;margin:0;font-weight:600}
+  header a{color:var(--dim);font-size:13px;text-decoration:none;margin-left:auto}
+  nav{display:flex;gap:6px;padding:12px 20px 0;overflow-x:auto;scrollbar-width:none}
+  nav button{background:none;border:none;color:var(--dim);padding:8px 14px;border-radius:8px 8px 0 0;cursor:pointer;font-size:14px;white-space:nowrap}
+  nav button.on{color:var(--txt);background:var(--card);border:1px solid var(--bord);border-bottom:none}
+  main{padding:18px 20px 60px}
+  .tab{display:none}.tab.on{display:block}
+  .card{background:var(--card);border:1px solid var(--bord);border-radius:12px;padding:16px;margin:0 0 16px}
+  .card h2{font-size:13px;margin:0 0 12px;color:var(--dim);text-transform:uppercase;letter-spacing:.05em}
+  .kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px}
+  .kpi{background:var(--card2);border:1px solid var(--bord);border-radius:10px;padding:12px 14px}
+  .kpi .v{font-size:22px;font-weight:600;font-variant-numeric:tabular-nums}.kpi .l{color:var(--dim);font-size:12px}
+  .kpi.alerta{border-color:#5a2020}.kpi.alerta .v{color:#ffb0b0}
+  table{width:100%;border-collapse:collapse}
+  th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--bord);vertical-align:middle}
+  th{color:var(--dim);font-weight:500;font-size:12px}
+  td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .badge{display:inline-block;font-size:11px;padding:2px 7px;border-radius:6px;border:1px solid var(--bord);background:var(--card2);color:var(--dim);white-space:nowrap}
+  .badge.pagar{background:#3a1c1c;color:#ffb0b0;border-color:#5a2020}
+  .badge.receber{background:#173a2a;color:#7ee2b0;border-color:#1f5a3f}
+  .badge.atraso{background:#3a2a10;color:#f5c26b;border-color:#5a4012}
+  button.act{background:var(--acc);color:#fff;border:none;border-radius:8px;padding:6px 11px;cursor:pointer;font-size:13px}
+  button.act.ghost{background:transparent;border:1px solid var(--bord);color:var(--txt)}
+  button.act.danger{background:transparent;border:1px solid #5a2020;color:#ff9a9a}
+  input.txt,select.txt,textarea.txt{background:var(--card2);border:1px solid var(--bord);color:var(--txt);border-radius:8px;padding:7px 9px;font-size:13px;min-width:0}
+  .form{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;align-items:end}
+  .form label{display:flex;flex-direction:column;gap:4px;color:var(--dim);font-size:12px}
+  .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  .msg{margin-top:8px;font-size:13px;min-height:18px}
+  .muted{color:var(--dim)} .mono{font-family:ui-monospace,Consolas,monospace;font-size:12px}
+  .lock{background:#2a2410;border:1px solid #5a4a12;color:#e9cf7a;border-radius:10px;padding:12px 14px;margin-bottom:14px}
+  .grafico{position:relative}
+  .grafico svg{width:100%;height:260px;display:block}
+  .tip{position:absolute;pointer-events:none;background:#0b0d11;border:1px solid var(--bord);border-radius:8px;padding:8px 10px;font-size:12px;display:none;white-space:nowrap;z-index:3}
+  .tabela-scroll{overflow-x:auto}
+  @media(max-width:640px){main{padding:14px 12px 60px}th,td{padding:7px 6px}.esconde-mob{display:none}}
+</style>
+</head>
+<body>
+<header>
+  <h1>Jarvis — Financeiro</h1>
+  <span class="badge" id="modo">local</span>
+  <a href="/panneau">← Painel</a>
+</header>
+<nav>
+  <button data-t="resumo" class="on">Resumo</button>
+  <button data-t="lancamentos">Lançamentos</button>
+  <button data-t="novo">Novo lançamento</button>
+  <button data-t="bancos">Bancos e contas</button>
+  <button data-t="extrato">Extrato e conciliação</button>
+  <button data-t="openfinance">Open Finance</button>
+</nav>
+<main>
+  <section id="resumo" class="tab on">
+    <div class="card"><h2>Situação</h2><div class="kpis" id="kpis"></div><div class="msg" id="alerta"></div></div>
+    <div class="card"><h2>Fluxo de caixa projetado — saldo diário</h2>
+      <div class="row" style="margin-bottom:8px">
+        <select class="txt" id="dias" onchange="carregarResumo()">
+          <option value="30">30 dias</option><option value="60">60 dias</option><option value="90">90 dias</option><option value="180">180 dias</option>
+        </select>
+        <span class="muted" style="font-size:12px">Saldo de hoje + a receber − a pagar em aberto (atrasados contam hoje).</span>
+      </div>
+      <div class="grafico" id="grafico"><svg id="svgFluxo" role="img" aria-label="Saldo projetado por dia"></svg><div class="tip" id="tip"></div></div>
+      <details style="margin-top:8px"><summary class="muted" style="cursor:pointer;font-size:12px">Ver tabela</summary>
+        <div class="tabela-scroll"><table><thead><tr><th>Data</th><th class="num">Entradas</th><th class="num">Saídas</th><th class="num">Saldo</th></tr></thead><tbody id="tabFluxo"></tbody></table></div></details>
+    </div>
+    <div class="card"><h2>Próximos 7 dias e atrasados</h2><div class="tabela-scroll"><table><tbody id="proximos"></tbody></table></div></div>
+    <div class="card"><h2>Saldos por conta</h2><div class="tabela-scroll"><table><tbody id="saldos"></tbody></table></div></div>
+  </section>
+
+  <section id="lancamentos" class="tab">
+    <div class="card">
+      <div class="row" style="margin-bottom:10px">
+        <select class="txt" id="fTipo"><option value="">Pagar e receber</option><option value="pagar">A pagar</option><option value="receber">A receber</option></select>
+        <select class="txt" id="fStatus"><option value="aberto">Em aberto</option><option value="atrasado">Atrasados</option><option value="baixado">Baixados</option><option value="cancelado">Cancelados</option><option value="">Todos</option></select>
+        <input class="txt" type="date" id="fDe" title="de"><input class="txt" type="date" id="fAte" title="até">
+        <input class="txt" id="fBusca" placeholder="Buscar…">
+        <button class="act" onclick="carregarLista()">Filtrar</button>
+        <a class="act ghost" href="/api/financeiro/exportar.csv" style="text-decoration:none;padding:6px 11px;border-radius:8px;border:1px solid var(--bord);color:var(--txt)">Exportar CSV</a>
+      </div>
+      <div class="tabela-scroll"><table><thead><tr><th>#</th><th>Tipo</th><th>Descrição</th><th class="esconde-mob">Conta</th><th class="esconde-mob">Categoria</th><th>Vencimento</th><th class="num">Valor</th><th></th></tr></thead>
+        <tbody id="lista"></tbody></table></div>
+      <div class="msg" id="listaMsg"></div>
+    </div>
+  </section>
+
+  <section id="novo" class="tab">
+    <div class="card"><h2>Novo lançamento</h2>
+      <div class="form">
+        <label>Tipo<select class="txt" id="nTipo" onchange="carregarCategorias()"><option value="pagar">A pagar</option><option value="receber">A receber</option></select></label>
+        <label>Descrição<input class="txt" id="nDesc" maxlength="120" placeholder="Conta de luz"></label>
+        <label>Valor (R$)<input class="txt" id="nValor" inputmode="decimal" placeholder="230,00"></label>
+        <label>Vencimento<input class="txt" type="date" id="nVenc"></label>
+        <label>Conta / banco<select class="txt" id="nConta"></select></label>
+        <label>Categoria<select class="txt" id="nCat"></select></label>
+        <label>Fornecedor / cliente<input class="txt" id="nContra" maxlength="80"></label>
+        <label>Recorrência<select class="txt" id="nRec"><option value="nenhuma">Nenhuma</option><option value="mensal">Mensal</option><option value="semanal">Semanal</option><option value="anual">Anual</option></select></label>
+        <label>Parcelas<input class="txt" type="number" id="nParc" min="1" max="120" value="1"></label>
+        <label style="grid-column:1/-1">Observação<input class="txt" id="nObs" maxlength="300"></label>
+      </div>
+      <div class="row" style="margin-top:12px"><button class="act" onclick="lancar()">Lançar</button>
+        <span class="muted" style="font-size:12px">Por voz: « Jarvis, lança conta de luz de 230 reais dia 10 no Itaú ».</span></div>
+      <div class="msg" id="novoMsg"></div>
+    </div>
+  </section>
+
+  <section id="bancos" class="tab">
+    <div class="card"><h2>Contas cadastradas</h2><div class="tabela-scroll"><table><thead><tr><th>Conta</th><th>Banco</th><th>Tipo</th><th class="num">Saldo inicial</th><th class="num">Saldo atual</th><th></th></tr></thead><tbody id="tabContas"></tbody></table></div></div>
+    <div class="card"><h2>Adicionar / editar conta</h2>
+      <div class="form">
+        <input type="hidden" id="cId">
+        <label>Nome<input class="txt" id="cNome" maxlength="60" placeholder="Itaú PJ"></label>
+        <label>Banco<input class="txt" id="cBanco" maxlength="60" placeholder="Itaú"></label>
+        <label>Tipo<select class="txt" id="cTipo"><option value="corrente">Conta corrente</option><option value="poupanca">Poupança</option><option value="cartao">Cartão de crédito</option><option value="carteira">Carteira / dinheiro</option><option value="investimento">Investimento</option></select></label>
+        <label>Saldo inicial (R$)<input class="txt" id="cSaldo" inputmode="decimal" placeholder="0,00"></label>
+        <label style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" id="cPadrao"> conta padrão</label>
+        <label style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" id="cAtiva" checked> ativa</label>
+      </div>
+      <div class="row" style="margin-top:12px"><button class="act" onclick="salvarConta()">Salvar conta</button><button class="act ghost" onclick="limparConta()">Limpar</button></div>
+      <div class="msg" id="contaMsg"></div>
+    </div>
+  </section>
+
+  <section id="extrato" class="tab">
+    <div class="card"><h2>Importar extrato (OFX)</h2>
+      <div class="muted" style="font-size:13px;margin-bottom:8px">Todo banco brasileiro exporta OFX (internet banking › extrato › exportar OFX/Money). Movimentos repetidos são ignorados.</div>
+      <div class="row"><select class="txt" id="oConta"></select><input type="file" id="oArq" accept=".ofx,.OFX" class="txt"><button class="act" onclick="importarOfx(this)">Importar</button></div>
+      <div class="msg" id="ofxMsg"></div>
+    </div>
+    <div class="card"><h2>Sugestões de conciliação</h2><div class="tabela-scroll"><table><tbody id="sugestoes"></tbody></table></div></div>
+    <div class="card"><h2>Movimentos pendentes</h2><div class="tabela-scroll"><table><thead><tr><th>Data</th><th>Conta</th><th>Descrição</th><th class="num">Valor</th><th></th></tr></thead><tbody id="pendentes"></tbody></table></div>
+      <div class="msg" id="concMsg"></div></div>
+  </section>
+
+  <section id="openfinance" class="tab">
+    <div class="card"><h2>Open Finance (Pluggy) — somente leitura</h2>
+      <div class="muted" style="font-size:13px;margin-bottom:10px">Integração bancária oficial do Open Finance Brasil via <a href="https://pluggy.ai" target="_blank" rel="noopener" style="color:var(--acc)">Pluggy</a> (serviço pago/trial).
+        Você conecta seus bancos no Pluggy Connect e informa aqui o <i>itemId</i>. O Jarvis só <b>lê</b> saldos e transações; nunca paga nem transfere.</div>
+      <div id="ofBloq" class="lock" style="display:none">Credenciais só podem ser alteradas no próprio PC.</div>
+      <div class="form">
+        <label>Client ID<input class="txt" id="ofId" autocomplete="off"></label>
+        <label>Client Secret<input class="txt" id="ofSecret" type="password" autocomplete="off"></label>
+        <label style="grid-column:1/-1">itemIds (um por linha)<textarea class="txt" id="ofItens" rows="3"></textarea></label>
+      </div>
+      <div class="row" style="margin-top:12px"><button class="act" onclick="salvarOf()">Salvar</button><button class="act ghost" onclick="sincronizar(this)">Sincronizar agora</button></div>
+      <div class="msg" id="ofMsg"></div>
+    </div>
+  </section>
+</main>
+
+<script>
+const $=(s,e=document)=>e.querySelector(s), $$=(s,e=document)=>[...e.querySelectorAll(s)];
+const LOCAIS=['127.0.0.1','localhost','[::1]','::1'];
+const api=async(u,o)=>{const r=await fetch(u,Object.assign({credentials:'same-origin'},o||{}));
+  if(r.status===403&&!LOCAIS.includes(location.hostname)&&!o){location.replace('/acesso');return{ok:false}}
+  try{return await r.json()}catch(e){return{ok:false,message:'resposta inválida'}}};
+const post=(u,b)=>api(u,{method:'POST',headers:{'Content-Type':'application/json','X-Jarvis-Panneau':'1'},body:JSON.stringify(b||{})});
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const brl=v=>'R$ '+Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+const dbr=iso=>iso?iso.slice(8,10)+'/'+iso.slice(5,7)+'/'+iso.slice(0,4):'';
+const hojeIso=()=>new Date(Date.now()-new Date().getTimezoneOffset()*6e4).toISOString().slice(0,10);
+const fl=(id,r)=>{const el=$('#'+id);if(el)el.innerHTML=`<span style="color:var(--${r.ok?'ok':'ko'})">${esc(r.message||'')}</span>`;};
+let CONTAS=[];
+
+$$('nav button').forEach(b=>b.onclick=()=>{
+  $$('nav button').forEach(x=>x.classList.toggle('on',x===b));
+  $$('.tab').forEach(t=>t.classList.toggle('on',t.id===b.dataset.t));
+  ({resumo:carregarResumo,lancamentos:carregarLista,novo:prepararNovo,bancos:carregarContas,extrato:carregarExtrato,openfinance:carregarOf}[b.dataset.t]||(()=>{}))();
+});
+
+/* ---------- resumo ---------- */
+async function carregarResumo(){
+  const d=await api('/api/financeiro/resumo?dias='+$('#dias').value);
+  if(!d.resumo)return;
+  $('#modo').textContent=d.modo==='distant'?'remoto':'local';
+  CONTAS=d.contas||[];
+  const r=d.resumo;
+  const k=[['Saldo nas contas',r.saldo_total,r.saldo_total<0],['A pagar atrasado',r.pagar_atrasado,r.pagar_atrasado>0],
+    ['A pagar hoje',r.pagar_hoje,false],['A pagar em 7 dias',r.pagar_7d,false],['A receber em 7 dias',r.receber_7d,false],
+    ['A receber atrasado',r.receber_atrasado,r.receber_atrasado>0],['Saldo projetado 30 dias',r.saldo_projetado_30d,r.saldo_projetado_30d<0]];
+  $('#kpis').innerHTML=k.map(([l,v,a])=>`<div class="kpi${a?' alerta':''}"><div class="v">${brl(v)}</div><div class="l">${esc(l)}</div></div>`).join('');
+  const f=d.fluxo;
+  $('#alerta').innerHTML=f.negativo?`<span style="color:var(--ko)">⚠ Caixa negativo previsto em ${dbr(f.data_menor_saldo)} — mínimo ${brl(f.menor_saldo)}.</span>`:'';
+  desenharFluxo(f.serie);
+  $('#tabFluxo').innerHTML=f.serie.filter(s=>s.entradas||s.saidas).map(s=>`<tr><td>${dbr(s.data)}</td><td class="num">${brl(s.entradas)}</td><td class="num">${brl(s.saidas)}</td><td class="num">${brl(s.saldo)}</td></tr>`).join('')||'<tr><td class="muted">Sem movimentos previstos.</td></tr>';
+  const ate=new Date(Date.now()+7*864e5).toISOString().slice(0,10);
+  const p=await api('/api/financeiro/lancamentos?status=aberto&ate='+ate);
+  $('#proximos').innerHTML=(p.itens||[]).map(linhaCurta).join('')||'<tr><td class="muted">Nada vencendo nos próximos 7 dias.</td></tr>';
+  $('#saldos').innerHTML=CONTAS.map(c=>`<tr><td>${esc(c.nome)}</td><td class="muted">${esc(c.banco)}</td><td class="num">${brl(c.saldo)}</td></tr>`).join('')||'<tr><td class="muted">Cadastre seus bancos em « Bancos e contas ».</td></tr>';
+}
+function linhaCurta(l){
+  const atraso=l.vencimento<hojeIso();
+  return `<tr><td><span class="badge ${l.tipo}">${l.tipo==='pagar'?'pagar':'receber'}</span>${atraso?' <span class="badge atraso">atrasado</span>':''}</td>
+    <td>${esc(l.descricao)}</td><td>${dbr(l.vencimento)}</td><td class="num">${brl(l.valor)}</td>
+    <td><button class="act ghost" onclick="baixar(${l.id})">${l.tipo==='pagar'?'Paguei':'Recebi'}</button></td></tr>`;
+}
+
+/* gráfico: uma série (saldo), linha 2px, linha do zero, crosshair + tooltip */
+function desenharFluxo(serie){
+  const svg=$('#svgFluxo'),W=svg.clientWidth||800,H=260,m={l:70,r:12,t:12,b:26};
+  const vals=serie.map(s=>s.saldo),mn=Math.min(0,...vals),mx=Math.max(0,...vals),pad=(mx-mn)*0.08||100;
+  const y0=mn-pad,y1=mx+pad,x=i=>m.l+(W-m.l-m.r)*i/Math.max(1,serie.length-1),y=v=>m.t+(H-m.t-m.b)*(1-(v-y0)/(y1-y0));
+  const ticks=5,linhas=[];
+  for(let i=0;i<=ticks;i++){const v=y0+(y1-y0)*i/ticks;linhas.push(`<line x1="${m.l}" x2="${W-m.r}" y1="${y(v)}" y2="${y(v)}" stroke="var(--grid)"/><text x="${m.l-8}" y="${y(v)+4}" fill="var(--dim)" font-size="11" text-anchor="end">${Number(v).toLocaleString('pt-BR',{maximumFractionDigits:0})}</text>`);}
+  const passo=Math.max(1,Math.ceil(serie.length/8)),rot=serie.map((s,i)=>i%passo?'':`<text x="${x(i)}" y="${H-8}" fill="var(--dim)" font-size="11" text-anchor="middle">${s.data.slice(8,10)}/${s.data.slice(5,7)}</text>`).join('');
+  // Saldo muda em degraus (valor vale até o próximo movimento): linha em escada.
+  const path=serie.map((s,i)=>i?`H${x(i).toFixed(1)}V${y(s.saldo).toFixed(1)}`:`M${x(0).toFixed(1)},${y(s.saldo).toFixed(1)}`).join('');
+  const marcos=serie.map((s,i)=>(s.entradas||s.saidas)?`<circle cx="${x(i)}" cy="${y(s.saldo)}" r="4" fill="${s.saldo<0?'var(--ko)':'var(--acc)'}" stroke="var(--card)" stroke-width="2"/>`:'').join('');
+  svg.setAttribute('viewBox',`0 0 ${W} ${H}`);
+  svg.innerHTML=linhas.join('')+`<line x1="${m.l}" x2="${W-m.r}" y1="${y(0)}" y2="${y(0)}" stroke="var(--ko)" stroke-dasharray="4 4" opacity=".6"/>`
+    +`<path d="${path}" fill="none" stroke="var(--acc)" stroke-width="2" stroke-linejoin="round"/>`+marcos+rot
+    +`<line id="cruz" y1="${m.t}" y2="${H-m.b}" stroke="var(--dim)" opacity="0"/><rect x="${m.l}" y="${m.t}" width="${W-m.l-m.r}" height="${H-m.t-m.b}" fill="transparent" id="alvo"/>`;
+  const tip=$('#tip'),cruz=$('#cruz');
+  $('#alvo').onmousemove=e=>{
+    const rc=svg.getBoundingClientRect(),px=(e.clientX-rc.left)*W/rc.width,i=Math.max(0,Math.min(serie.length-1,Math.round((px-m.l)/((W-m.l-m.r)/Math.max(1,serie.length-1))))),s=serie[i];
+    cruz.setAttribute('x1',x(i));cruz.setAttribute('x2',x(i));cruz.setAttribute('opacity','.6');
+    tip.style.display='block';tip.innerHTML=`<b>${dbr(s.data)}</b><br>Saldo: ${brl(s.saldo)}${s.entradas?`<br>Entradas: ${brl(s.entradas)}`:''}${s.saidas?`<br>Saídas: ${brl(s.saidas)}`:''}`;
+    const left=Math.min(rc.width-tip.offsetWidth-4,Math.max(0,x(i)*rc.width/W+12));tip.style.left=left+'px';tip.style.top='10px';};
+  $('#alvo').onmouseleave=()=>{tip.style.display='none';cruz.setAttribute('opacity','0');};
+}
+window.addEventListener('resize',()=>{if($('#resumo').classList.contains('on'))carregarResumo();});
+
+/* ---------- lista ---------- */
+async function carregarLista(){
+  const q=new URLSearchParams({tipo:$('#fTipo').value,status:$('#fStatus').value,de:$('#fDe').value,ate:$('#fAte').value,busca:$('#fBusca').value});
+  const d=await api('/api/financeiro/lancamentos?'+q);
+  const hoje=hojeIso();
+  $('#lista').innerHTML=(d.itens||[]).map(l=>`<tr><td class="muted">${l.id}</td>
+    <td><span class="badge ${l.tipo}">${l.tipo}</span>${l.status==='aberto'&&l.vencimento<hoje?' <span class="badge atraso">atrasado</span>':''}${l.status!=='aberto'?` <span class="badge">${esc(l.status)}</span>`:''}</td>
+    <td>${esc(l.descricao)}${l.parcelas?` <span class="muted">${l.parcela}/${l.parcelas}</span>`:''}${l.recorrencia!=='nenhuma'?` <span class="muted">↻ ${esc(l.recorrencia)}</span>`:''}${l.contraparte?`<br><small class="muted">${esc(l.contraparte)}</small>`:''}</td>
+    <td class="esconde-mob">${esc(l.conta||'—')}</td><td class="esconde-mob">${esc(l.categoria)}</td><td>${dbr(l.vencimento)}</td>
+    <td class="num">${brl(l.valor_baixa||l.valor)}</td>
+    <td><div class="row">${l.status==='aberto'?`<button class="act ghost" onclick="baixar(${l.id})">${l.tipo==='pagar'?'Paguei':'Recebi'}</button><button class="act ghost" onclick="cancelar(${l.id})">Cancelar</button>`:''}
+      ${l.status==='baixado'?`<button class="act ghost" onclick="estornar(${l.id})">Estornar</button>`:''}
+      <button class="act danger" onclick="excluir(${l.id})" title="Excluir definitivamente">×</button></div></td></tr>`).join('')||'<tr><td colspan="8" class="muted">Nenhum lançamento.</td></tr>';
+}
+async function baixar(id){
+  const v=prompt('Valor pago/recebido (vazio = valor do título):','');if(v===null)return;
+  const r=await post('/api/financeiro/baixar',{id,valor:v||null});alert(r.message);carregarLista();carregarResumo();}
+async function cancelar(id){if(!confirm('Cancelar o lançamento #'+id+'?'))return;const r=await post('/api/financeiro/cancelar',{id});fl('listaMsg',r);carregarLista();}
+async function estornar(id){const r=await post('/api/financeiro/estornar',{id});fl('listaMsg',r);carregarLista();}
+async function excluir(id){if(!confirm('Excluir DEFINITIVAMENTE o lançamento #'+id+'?'))return;const r=await post('/api/financeiro/excluir',{id});fl('listaMsg',r);carregarLista();}
+
+/* ---------- novo ---------- */
+async function prepararNovo(){
+  if(!$('#nVenc').value)$('#nVenc').value=hojeIso();
+  const d=await api('/api/financeiro/contas');CONTAS=d.contas||[];
+  $('#nConta').innerHTML='<option value="">— conta padrão —</option>'+CONTAS.filter(c=>c.ativa).map(c=>`<option value="${c.id}">${esc(c.nome)}</option>`).join('');
+  carregarCategorias();
+}
+let CATS=null;
+async function carregarCategorias(){CATS=CATS||await api('/api/financeiro/categorias');$('#nCat').innerHTML=(CATS[$('#nTipo').value]||[]).map(c=>`<option>${esc(c)}</option>`).join('');}
+async function lancar(){
+  const r=await post('/api/financeiro/lancar',{tipo:$('#nTipo').value,descricao:$('#nDesc').value,valor:$('#nValor').value,vencimento:$('#nVenc').value,
+    conta_id:$('#nConta').value||null,categoria:$('#nCat').value,contraparte:$('#nContra').value,recorrencia:$('#nRec').value,parcelas:+$('#nParc').value||1,observacao:$('#nObs').value});
+  fl('novoMsg',r);if(r.ok){$('#nDesc').value='';$('#nValor').value='';$('#nObs').value='';$('#nParc').value=1;}
+}
+
+/* ---------- contas ---------- */
+async function carregarContas(){
+  const d=await api('/api/financeiro/contas');CONTAS=d.contas||[];
+  $('#tabContas').innerHTML=CONTAS.map(c=>`<tr><td>${esc(c.nome)}${c.nome===d.padrao?' <span class="badge receber">padrão</span>':''}${c.ativa?'':' <span class="badge">inativa</span>'}${c.externo_id?' <span class="badge">Open Finance</span>':''}</td>
+    <td>${esc(c.banco)}</td><td>${esc(c.tipo)}</td><td class="num">${brl(c.saldo_inicial)}</td><td class="num">${brl(c.saldo)}</td>
+    <td><button class="act ghost" onclick='editarConta(${JSON.stringify(c).replace(/'/g,"&#39;")})'>Editar</button></td></tr>`).join('')||'<tr><td colspan="6" class="muted">Nenhuma conta ainda.</td></tr>';
+}
+function editarConta(c){$('#cId').value=c.id;$('#cNome').value=c.nome;$('#cBanco').value=c.banco;$('#cTipo').value=c.tipo;$('#cSaldo').value=String(c.saldo_inicial).replace('.',',');$('#cAtiva').checked=!!c.ativa;}
+function limparConta(){['cId','cNome','cBanco','cSaldo'].forEach(i=>$('#'+i).value='');$('#cAtiva').checked=true;$('#cPadrao').checked=false;}
+async function salvarConta(){
+  const r=await post('/api/financeiro/contas',{id:$('#cId').value||null,nome:$('#cNome').value,banco:$('#cBanco').value,tipo:$('#cTipo').value,
+    saldo_inicial:$('#cSaldo').value||'0',ativa:$('#cAtiva').checked,padrao:$('#cPadrao').checked});
+  fl('contaMsg',r);if(r.ok){limparConta();carregarContas();}
+}
+
+/* ---------- extrato ---------- */
+async function carregarExtrato(){
+  const c=await api('/api/financeiro/contas');CONTAS=c.contas||[];
+  $('#oConta').innerHTML=CONTAS.map(x=>`<option value="${x.id}">${esc(x.nome)}</option>`).join('')||'<option value="">cadastre uma conta</option>';
+  const d=await api('/api/financeiro/extrato');
+  $('#sugestoes').innerHTML=(d.sugestoes||[]).map(s=>`<tr><td>${dbr(s.data)}</td><td>${esc(s.descricao_extrato)}<br><small class="muted">→ título: ${esc(s.descricao_titulo)}</small></td>
+    <td class="num">${brl(s.valor)}</td><td><button class="act" onclick="conciliar(${s.extrato_id},${s.lancamento_id})">Conciliar e baixar</button></td></tr>`).join('')||'<tr><td class="muted">Nenhuma sugestão.</td></tr>';
+  $('#pendentes').innerHTML=(d.itens||[]).map(e=>`<tr><td>${dbr(e.data)}</td><td>${esc(e.conta)}</td><td>${esc(e.descricao)}</td>
+    <td class="num" style="color:var(--${e.valor<0?'ko':'ok'})">${brl(e.valor)}</td><td><button class="act ghost" onclick="conciliar(${e.id},null)" title="Entra no saldo sem título">Registrar avulso</button></td></tr>`).join('')||'<tr><td colspan="5" class="muted">Nenhum movimento pendente.</td></tr>';
+}
+async function importarOfx(btn){
+  const f=$('#oArq').files[0];if(!f){fl('ofxMsg',{ok:false,message:'Escolha o arquivo OFX.'});return}
+  btn.disabled=true;const b64=await new Promise(ok=>{const r=new FileReader();r.onload=()=>ok(String(r.result).split(',')[1]);r.readAsDataURL(f);});
+  const r=await post('/api/financeiro/importar-ofx',{conta_id:$('#oConta').value,conteudo:b64});btn.disabled=false;fl('ofxMsg',r);carregarExtrato();
+}
+async function conciliar(extrato_id,lancamento_id){const r=await post('/api/financeiro/conciliar',{extrato_id,lancamento_id});fl('concMsg',r);carregarExtrato();}
+
+/* ---------- open finance ---------- */
+async function carregarOf(){const d=await api('/api/financeiro/openfinance');$('#ofId').placeholder=d.client_id||'';$('#ofItens').value=(d.itens||[]).join('\n');}
+async function salvarOf(){
+  const r=await post('/api/financeiro/openfinance',{client_id:$('#ofId').value,client_secret:$('#ofSecret').value,itens:$('#ofItens').value.split('\n').map(x=>x.trim()).filter(Boolean)});
+  if(r.message&&r.message.includes('somente localmente'))$('#ofBloq').style.display='';
+  fl('ofMsg',r);if(r.ok){$('#ofId').value='';$('#ofSecret').value='';carregarOf();}
+}
+async function sincronizar(btn){btn.disabled=true;fl('ofMsg',{ok:true,message:'Sincronizando…'});const r=await post('/api/financeiro/sincronizar',{dias:60});btn.disabled=false;fl('ofMsg',r);}
+
+carregarResumo();
+</script>
+</body>
+</html>
