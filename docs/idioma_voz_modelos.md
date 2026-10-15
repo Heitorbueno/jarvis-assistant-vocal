@@ -111,3 +111,19 @@ responde em português e não cai mais em Paris quando a localização falha.
 
 **ElevenLabs**: o painel recusa o *ID* da chave (erro `api_key_id_used_as_api_key`);
 use a chave que começa com `sk_`, exibida só ao criar/rotacionar.
+
+## 8. Manutenção, primeiros passos e conversa
+
+- **Primeiros passos** (topo do painel): checklist do que falta configurar (idioma,
+  cérebro, voz, início automático, prompt, widgets, financeiro, acesso remoto), com
+  botão que leva à aba certa. Some quando tudo estiver feito (ou em « ocultar »).
+- **Manutenção** (somente no PC):
+  - *Atualizar*: verifica novidades no GitHub e roda `git pull --ff-only` + `uv sync`
+    (nunca força nem descarta alterações locais); depois, reinicie o Jarvis.
+  - *Backup*: ZIP com config.yaml (chaves), memória, finanças, notas e calibrações.
+    *Restaurar* só aceita ZIP gerado pelo Jarvis e só esses caminhos; o estado atual
+    é salvo antes em `logs/antes-da-restauracao-*.zip`.
+  - *Diagnóstico*: roda `scripts/doctor.py` e mostra o resultado.
+  - *Logs*: últimas linhas de `logs/*.log`, com chaves e tokens mascarados.
+- **Conversa**: últimas falas entre você e o Jarvis (também no acesso remoto
+  autenticado); nada é gravado em disco.

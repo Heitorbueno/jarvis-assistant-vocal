@@ -1137,6 +1137,92 @@ def monter_routes(app):
         d = await _corps(request)
         return autostart.configurer(bool(d.get("ativar")), str(d.get("modo", "completo")))
 
+    # -- manutencao : atualizar, backup, diagnostico, logs (LOCAL) ; checklist et historique --
+    @app.get("/api/panneau/primeiros-passos")
+    def api_checklist(request: Request):
+        if (r := garde(request)):
+            return r
+        from core import manutencao
+        return manutencao.checklist()
+
+    @app.get("/api/panneau/historico")
+    def api_historique(request: Request):
+        if (r := garde(request)):
+            return r
+        from core import manutencao
+        return manutencao.historico()
+
+    @app.get("/api/panneau/manutencao")
+    def api_manut(request: Request):
+        if (r := garde(request, local=True)):
+            return r
+        from core import manutencao
+        return {"versao": manutencao.versao(), "logs": manutencao.logs_disponiveis(),
+                "atualizacao": manutencao.etat_atualizacao()}
+
+    @app.post("/api/panneau/manutencao/verificar")
+    def api_manut_verif(request: Request):
+        if (r := garde(request, local=True)):
+            return r
+        from core import manutencao
+        return manutencao.verificar_atualizacao()
+
+    @app.post("/api/panneau/manutencao/atualizar")
+    def api_manut_maj(request: Request):
+        if (r := garde(request, local=True)):
+            return r
+        from core import manutencao
+        return manutencao.atualizar()
+
+    @app.get("/api/panneau/manutencao/atualizacao")
+    def api_manut_maj_etat(request: Request):
+        if (r := garde(request, local=True)):
+            return r
+        from core import manutencao
+        return manutencao.etat_atualizacao()
+
+    @app.post("/api/panneau/manutencao/diagnostico")
+    def api_manut_diag(request: Request):
+        if (r := garde(request, local=True)):
+            return r
+        from core import manutencao
+        return manutencao.diagnostico()
+
+    @app.get("/api/panneau/manutencao/log")
+    def api_manut_log(request: Request, nome: str = "", linhas: int = 200):
+        if (r := garde(request, local=True)):
+            return r
+        from core import manutencao
+        return manutencao.ler_log(nome, linhas)
+
+    @app.get("/api/panneau/manutencao/backup")
+    def api_manut_backup(request: Request):
+        if (r := garde(request, local=True)):
+            return r
+        from fastapi.responses import Response
+        from core import manutencao
+        import time as _t
+        try:
+            dados = manutencao.gerar_backup()
+        except ValueError as e:
+            return JSONResponse({"ok": False, "message": str(e)}, status_code=400)
+        return Response(dados, media_type="application/zip", headers={
+            "Content-Disposition": f"attachment; filename=jarvis-backup-{_t.strftime('%Y%m%d-%H%M')}.zip",
+            "Cache-Control": "no-store"})
+
+    @app.post("/api/panneau/manutencao/restaurar")
+    async def api_manut_restaurer(request: Request):
+        if (r := garde(request, local=True)):
+            return r
+        import base64
+        from core import manutencao
+        d = await _corps(request)
+        try:
+            brut = base64.b64decode(str(d.get("conteudo", "")), validate=True)
+        except Exception:
+            return {"ok": False, "message": "Arquivo inválido."}
+        return manutencao.restaurar_backup(brut)
+
     # -- widgets du HUD (« loja ») --
     def _rafraichir_hud():
         import sys as _sys
