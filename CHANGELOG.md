@@ -16,6 +16,17 @@ Toutes les évolutions notables de Jarvis. Format inspiré de
 - PWA (manifeste, service worker, icônes) pour desktop, Android et iOS (`core/pwa.py`).
 - Docs `docs/acces_distant.md`, tests `tests/test_acces_distant.py`.
 
+- Langue pt-BR sélectionnable (`assistant.langue`, `core/langue.py`) : réponses,
+  Whisper, voix, confirmations « sim/não », phrases système, panneau traduit
+  (`web/pwa/i18n.js`), outil vocal `changer_langue`.
+- Ollama depuis le panneau (`core/ollama_gestion.py`) : détection automatique,
+  installation officielle, démarrage, proposition d'installer un modèle absent.
+- Favoris par fournisseur, outil vocal `changer_modele_ia` et repli (fallback)
+  optionnel entre modèles (`core/llm.py`, `llm.repli`).
+- Voix (`core/voix_gestion.py`) : réglages fins ElevenLabs, clonage par upload,
+  voix Piper (catalogue, import, choix) et vitesse Piper/Kokoro.
+- Docs `docs/idioma_voz_modelos.md`, tests `tests/test_langue_voix_modeles.py`.
+
 ### Modifié
 - Serveur unifié : `proxy_headers=False` (adresse de socket réelle vérifiée).
 - Installateur : plus aucune clé demandée ; Ollama installé nativement en mode local.

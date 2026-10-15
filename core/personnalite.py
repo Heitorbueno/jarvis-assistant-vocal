@@ -22,7 +22,11 @@ DEFAUT = "neutre"
 
 
 def persona(nom):
-    """Renvoie le texte de personnalite pour un preset (defaut si inconnu)."""
+    """Renvoie le texte de personnalite pour un preset (defaut si inconnu),
+    dans la langue configuree (assistant.langue)."""
+    from core import langue
+    if langue.est_pt():
+        return langue.PERSONAS_PT.get(nom, langue.PERSONAS_PT[DEFAUT])
     return PRESETS.get(nom, PRESETS[DEFAUT])
 
 
@@ -31,8 +35,10 @@ def normaliser(mode):
     m = sans_accents(mode).strip()
     if "jarvis" in m or "sarcas" in m or "iron" in m or "stark" in m:
         return "jarvis_sarcastique"
-    if "concis" in m or "court" in m or "bref" in m or "rapide" in m:
+    if ("concis" in m or "court" in m or "bref" in m or "rapide" in m
+            or "curto" in m or "breve" in m or "direto" in m):
         return "concis"
-    if "neutre" in m or "normal" in m or "standard" in m or "classique" in m:
+    if ("neutre" in m or "normal" in m or "standard" in m or "classique" in m
+            or "neutro" in m or "padrao" in m or "classico" in m):
         return "neutre"
     return m

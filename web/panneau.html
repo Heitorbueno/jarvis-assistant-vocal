@@ -82,6 +82,9 @@
   <h1>Jarvis — Panneau de configuration</h1>
   <span id="pill-mode" class="pill local">local</span>
   <span id="hdr" class="muted" style="margin-left:auto;font-size:12px"></span>
+  <select id="sel-langue" class="txt" style="min-width:0;width:auto" title="Idioma" onchange="mudarIdioma(this.value)">
+    <option value="fr">FR</option><option value="pt">PT-BR</option>
+  </select>
   <button id="btn-sair" class="act ghost" style="display:none" onclick="sair()">Sair</button>
 </header>
 <nav>
@@ -91,6 +94,7 @@
   <button data-t="perms">Permissions</button>
   <button data-t="provedores">Provedores IA</button>
   <button data-t="eleven">ElevenLabs</button>
+  <button data-t="vozlocal">Voz local</button>
   <button data-t="remoto">Acesso remoto</button>
 </nav>
 <main>
@@ -233,6 +237,16 @@
         OpenAI, Anthropic e Ollama podem ser o <b>cérebro</b> do Jarvis; os demais ficam salvos para conectores.</div>
       <div id="prov-lista"></div>
     </div>
+    <div class="card"><h2>Ordem de fallback</h2>
+      <div class="muted" style="font-size:13px;margin-bottom:10px">Se o modelo principal falhar (erro, sem crédito, fora do ar), o Jarvis tenta estes, em ordem.
+        No modo local, só entradas Ollama são usadas. Adicione a partir dos favoritos de cada provedor.</div>
+      <label><input type="checkbox" id="fb-ativo"> fallback ativo</label>
+      <div id="fb-lista" style="margin-top:10px"></div>
+      <div class="lin" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px">
+        <select id="fb-add" class="txt"></select><button class="act ghost" onclick="fbAdicionar()">Adicionar</button>
+        <button class="act" onclick="fbSalvar()">Salvar fallback</button></div>
+      <div class="msg" id="fb-msg"></div>
+    </div>
   </section>
 
   <section id="eleven" class="tab">
@@ -257,9 +271,69 @@
             <button class="act ghost" onclick="testerVoix()">Ouvir teste no PC</button>
           </div>
           <div class="msg" id="el-msg"></div>
-          <small class="note">Link: <a href="https://elevenlabs.io/app/settings/api-keys" target="_blank" rel="noopener" style="color:var(--acc)">elevenlabs.io → API keys</a> (a chave precisa da permissão <i>Voices: read</i>).</small>
+          <small class="note">Link: <a href="https://elevenlabs.io/app/settings/api-keys" target="_blank" rel="noopener" style="color:var(--acc)">elevenlabs.io → API keys</a> (a chave precisa da permissão <i>Voices: read</i>; para clonar, <i>Voices: write</i>).</small>
         </div>
       </div>
+    </div>
+    <div class="card"><h2>Ajustes da voz (ElevenLabs)</h2>
+      <div class="fld"><div class="lab"><b>Estabilidade</b><small>Baixo = mais expressiva/emotiva; alto = mais constante.</small></div>
+        <input type="range" min="0" max="1" step="0.05" data-aj="elevenlabs.stabilite" data-def="0.5"><span class="rngval"></span></div>
+      <div class="fld"><div class="lab"><b>Similaridade</b><small>Fidelidade ao timbre original da voz.</small></div>
+        <input type="range" min="0" max="1" step="0.05" data-aj="elevenlabs.similarite" data-def="0.75"><span class="rngval"></span></div>
+      <div class="fld"><div class="lab"><b>Estilo / calor</b><small>Exagero de estilo e emoção (aumenta a latência).</small></div>
+        <input type="range" min="0" max="1" step="0.05" data-aj="elevenlabs.style" data-def="0"><span class="rngval"></span></div>
+      <div class="fld"><div class="lab"><b>Velocidade</b><small>0.7 = lenta · 1.0 = normal · 1.2 = rápida.</small></div>
+        <input type="range" min="0.7" max="1.2" step="0.05" data-aj="elevenlabs.vitesse" data-def="1"><span class="rngval"></span></div>
+      <div class="fld"><div class="lab"><b>Speaker boost</b><small>Reforça a semelhança com a voz.</small></div>
+        <label><input type="checkbox" id="aj-boost"> ativar</label></div>
+      <div class="row" style="margin-top:10px">
+        <button class="act" onclick="salvarAjustes('elevenlabs')">Salvar ajustes</button>
+        <button class="act ghost" onclick="restaurarAjustes('elevenlabs')">Restaurar padrão</button>
+        <button class="act ghost" onclick="testerVoix()">Ouvir teste no PC</button></div>
+      <div class="msg" id="aj-msg-elevenlabs"></div>
+    </div>
+    <div class="card"><h2>Clonar voz (sua própria voz)</h2>
+      <div class="muted" style="font-size:13px;margin-bottom:10px">Envie de 1 a 25 gravações limpas (1 a 3 minutos no total é o ideal; até 25 MB).
+        A voz fica salva na sua conta ElevenLabs e pode virar a voz do Jarvis. Use apenas vozes que você tem direito de clonar.</div>
+      <div class="lin" style="display:flex;flex-wrap:wrap;gap:8px">
+        <input id="cl-nome" class="txt" placeholder="Nome da voz" style="flex:1 1 200px">
+        <input id="cl-arquivos" type="file" accept="audio/*" multiple class="txt" style="flex:1 1 240px">
+      </div>
+      <div style="margin-top:8px"><label><input type="checkbox" id="cl-ruido"> remover ruído de fundo</label>
+        <label style="margin-left:12px"><input type="checkbox" id="cl-usar" checked> usar como voz do Jarvis</label></div>
+      <div class="row" style="margin-top:10px"><button class="act" onclick="clonarVoz(this)">Clonar voz</button></div>
+      <div class="msg" id="cl-msg"></div>
+    </div>
+  </section>
+
+  <section id="vozlocal" class="tab">
+    <div class="card"><h2>Vozes locais (Piper)</h2>
+      <div class="muted" style="font-size:13px;margin-bottom:10px">Vozes 100% offline, salvas na pasta <span class="mono">voix/</span> deste PC.</div>
+      <table><thead><tr><th>Voz</th><th>Tamanho</th><th></th></tr></thead><tbody id="vl-lista"></tbody></table>
+      <div class="msg" id="vl-msg"></div>
+    </div>
+    <div class="card"><h2>Baixar voz do catálogo oficial</h2><div id="vl-catalogo"></div></div>
+    <div class="card"><h2>Importar voz (.onnx + .onnx.json)</h2>
+      <div class="lin" style="display:flex;flex-wrap:wrap;gap:8px">
+        <label class="muted">.onnx <input id="vl-onnx" type="file" accept=".onnx" class="txt"></label>
+        <label class="muted">.onnx.json <input id="vl-json" type="file" accept=".json" class="txt"></label>
+        <button class="act" onclick="importarPiper(this)">Importar</button></div>
+      <div class="msg" id="vl-imp-msg"></div>
+    </div>
+    <div class="card"><h2>Ajustes da voz local</h2>
+      <div class="fld"><div class="lab"><b>Velocidade (Piper)</b><small>1.0 = normal.</small></div>
+        <input type="range" min="0.5" max="2" step="0.05" data-aj="piper.vitesse" data-def="1"><span class="rngval"></span></div>
+      <div class="fld"><div class="lab"><b>Variação de entonação (Piper)</b><small>Mais alto = mais expressiva.</small></div>
+        <input type="range" min="0" max="1.5" step="0.05" data-aj="piper.variation" data-def="0.667"><span class="rngval"></span></div>
+      <div class="fld"><div class="lab"><b>Variação de ritmo (Piper)</b></div>
+        <input type="range" min="0" max="1.5" step="0.05" data-aj="piper.variation_duree" data-def="0.8"><span class="rngval"></span></div>
+      <div class="fld"><div class="lab"><b>Velocidade (Kokoro)</b></div>
+        <input type="range" min="0.5" max="2" step="0.05" data-aj="kokoro.vitesse" data-def="1"><span class="rngval"></span></div>
+      <div class="row" style="margin-top:10px">
+        <button class="act" onclick="salvarAjustes('local')">Salvar ajustes</button>
+        <button class="act ghost" onclick="restaurarAjustes('local')">Restaurar padrão</button>
+        <button class="act ghost" onclick="testerVoix()">Ouvir teste no PC</button></div>
+      <div class="msg" id="aj-msg-local"></div>
     </div>
   </section>
 
@@ -317,7 +391,8 @@ $$('nav button').forEach(b=>b.onclick=()=>{
   if(b.dataset.t==='etat'){chargerEtat();chargerBudget();chargerActivite();chargerTaches();} if(b.dataset.t==='perms')chargerPerms();
   if(b.dataset.t==='reglages')chargerReglages();
   if(b.dataset.t==='provedores')chargerProvedores();
-  if(b.dataset.t==='eleven')chargerEleven();
+  if(b.dataset.t==='eleven'){chargerEleven();chargerAjustesVoz();}
+  if(b.dataset.t==='vozlocal'){chargerVozLocal();chargerAjustesVoz();}
   if(b.dataset.t==='remoto')chargerRemoto();
 });
 const fmt=n=>esc((n||0).toLocaleString('fr-FR'));
@@ -613,11 +688,17 @@ async function chargerSession(){
   $('#btn-sair').style.display=dist?'':'none';
 }
 async function sair(){await post('/api/acesso/sair',{});location.replace('/acesso');}
+async function mudarIdioma(v){
+  const r=await post('/api/panneau/reglage',{cle:'assistant.langue',valeur:v});
+  if(r.ok) location.reload(); else alert(r.message||'erro');
+}
+(function(){const s=$('#sel-langue');if(s)s.value=document.documentElement.dataset.langue||'fr';})();
 
 /* ---------- PROVEDORES ---------- */
 const PROV={};
 function provMsg(id,r){const el=$('#pm-'+id); if(el) el.innerHTML=`<span style="color:var(--${r.ok?'ok':'ko'})">${esc(r.message||'')}</span>`;}
 function provOptions(id){
+  if(id==='ollama'&&OLL) return ollamaOptions();
   const p=PROV[id]; const f=($('#pb-'+id)?.value||'').toLowerCase();
   const lista=(p.modeles||[]).filter(m=>!f||m.toLowerCase().includes(f)).slice(0,400);
   const atual=p.modele;
@@ -632,7 +713,9 @@ async function chargerProvedores(){
     const cer=p.cerveau?'<span class="badge">pode ser cérebro</span>':'<span class="badge">conector</span>';
     const act=p.actif?'<span class="badge on">ATIVO</span>':'';
     const linhaChave=p.sans_cle
-      ?`<div class="lin"><input id="ph-${p.id}" class="txt" value="${esc(p.hote)}" placeholder="http://localhost:11434">
+      ?`<div id="oll-det" class="lin muted">Detectando Ollama…</div>
+        <div class="prog" id="oll-prog"><i></i></div>
+        <div class="lin"><input id="ph-${p.id}" class="txt" value="${esc(p.hote)}" placeholder="http://localhost:11434">
          <button class="act" onclick="provHost()">Salvar endereço</button></div>`
       :`<div class="lin"><input id="pk-${p.id}" class="txt" type="password" autocomplete="off" placeholder="Cole a chave de API">
          <button class="act" onclick="provChave('${p.id}',false)">Salvar</button>
@@ -647,10 +730,39 @@ async function chargerProvedores(){
         <div class="lin"><select id="ps-${p.id}" class="txt"></select>${perfil}
           <button class="act ghost" onclick="provModelo('${p.id}')">Salvar modelo</button>
           ${p.cerveau?`<button class="act" onclick="provAtivar('${p.id}')">Usar como cérebro</button>`:''}</div>
+        <div class="lin"><span class="muted" style="font-size:12px">Modelos favoritos:</span>
+          ${(p.favoris||[]).map(f=>`<span class="badge">${esc(f)}
+            ${p.cerveau?`<a href="#" onclick="provFavUsar('${p.id}','${esc(f)}');return false" style="color:var(--acc)">usar</a>`:''}
+            <a href="#" onclick="provFav('${p.id}','${esc(f)}',true);return false" style="color:var(--ko)">×</a></span>`).join('')||'<span class="muted" style="font-size:12px">nenhum</span>'}
+          <button class="act ghost" onclick="provFav('${p.id}',provSel('${p.id}'),false)">★ Adicionar aos favoritos</button></div>
         <small class="note">Modelo salvo: <span class="mono">${esc(p.modele||'—')}</span>${p.modele_qualite?` · qualidade: <span class="mono">${esc(p.modele_qualite)}</span>`:''}</small>
         <div class="msg" id="pm-${p.id}"></div></div></div>`;}).join('');
   $('#prov-lista').innerHTML=html;
   Object.keys(PROV).forEach(provOptions);
+  ollamaDetectar();
+  FB=(d.repli&&d.repli.ordem)||[]; $('#fb-ativo').checked=!!(d.repli&&d.repli.ativo); fbRender();
+}
+let FB=[];
+function fbRender(){
+  $('#fb-lista').innerHTML=FB.map((e,i)=>`<div class="fld"><span class="mono">${i+1}. ${esc(e)}</span>
+    <span><button class="act ghost" onclick="fbMover(${i},-1)">↑</button> <button class="act ghost" onclick="fbMover(${i},1)">↓</button>
+    <button class="act danger" onclick="FB.splice(${i},1);fbRender()">×</button></span></div>`).join('')||'<div class="muted">Nenhum fallback configurado.</div>';
+  const opts=[]; Object.values(PROV).filter(p=>p.cerveau).forEach(p=>(p.favoris||[]).forEach(f=>opts.push(`${p.id}:${f}`)));
+  $('#fb-add').innerHTML=opts.filter(o=>!FB.includes(o)).map(o=>`<option>${esc(o)}</option>`).join('')||'<option value="">— favorite modelos primeiro —</option>';
+}
+function fbMover(i,d){const j=i+d;if(j<0||j>=FB.length)return;[FB[i],FB[j]]=[FB[j],FB[i]];fbRender();}
+function fbAdicionar(){const v=$('#fb-add').value;if(v&&!FB.includes(v)){FB.push(v);fbRender();}}
+async function fbSalvar(){fl('fb-msg',await post('/api/panneau/provedores/fallback',{ativo:$('#fb-ativo').checked,ordem:FB}));}
+async function provFav(id,modelo,remover){
+  if(!modelo){provMsg(id,{ok:false,message:'Escolha um modelo.'});return}
+  if(id==='ollama'&&!remover&&!(await ollamaGarantir(modelo)))return;
+  const r=await post('/api/panneau/provedores/favorito',{id,modelo,remover});
+  if(r.ok) await chargerProvedores(); provMsg(id,r);
+}
+async function provFavUsar(id,modelo){
+  if(id==='ollama'&&!(await ollamaGarantir(modelo)))return;
+  const r=await post('/api/panneau/provedores/ativar',{id,modelo,perfil:provPerf(id)});
+  if(r.ok){await chargerProvedores();chargerModeles();} provMsg(id,r);
 }
 async function provChave(id,remover){
   const v=remover?'':($('#pk-'+id).value||'').trim();
@@ -671,13 +783,89 @@ const provSel=id=>($('#ps-'+id)?.value||'').trim();
 const provPerf=id=>$('#pp-'+id)?.value||'hybride';
 async function provModelo(id){
   const m=provSel(id); if(!m){provMsg(id,{ok:false,message:'Escolha um modelo.'});return}
+  if(id==='ollama'&&!(await ollamaGarantir(m)))return;
   const r=await post('/api/panneau/provedores/modelo',{id,modelo:m,perfil:provPerf(id)});
   if(r.ok){await chargerProvedores();} provMsg(id,r);
 }
 async function provAtivar(id){
   const m=provSel(id);
+  if(id==='ollama'){if(!m){provMsg(id,{ok:false,message:'Escolha um modelo.'});return}
+    if(!(await ollamaGarantir(m)))return;}
   const r=await post('/api/panneau/provedores/ativar',{id,modelo:m,perfil:provPerf(id)});
   if(r.ok){await chargerProvedores();chargerModeles();} provMsg(id,r);
+}
+
+
+/* ---------- OLLAMA (detecção automática, instalação, modelos) ---------- */
+let OLL=null;
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+async function ollamaDetectar(){
+  const el=$('#oll-det'); if(!el) return;
+  const d=await api('/api/panneau/ollama/detectar'); OLL=d;
+  let h;
+  if(d.joignable){
+    h=bYes(`detectado v${d.version}`)+` <span class="mono">${esc(d.hote)}</span> · ${d.modeles.length} modelo(s) instalado(s)`
+      +(d.hote_corrige?' · <b>endereço corrigido automaticamente</b>':'');
+  }else if(d.installe){
+    h=bNo('instalado, mas parado')+` <button class="act" onclick="ollamaIniciar(this)">Iniciar Ollama</button>`;
+  }else{
+    h=bNo('não instalado')+(d.methode_installation
+      ?` <button class="act" onclick="ollamaInstalar(this)">Instalar Ollama</button> <small class="note">via ${esc(d.methode_installation)}</small>`
+      :` <small class="note">Instale em <a href="https://ollama.com/download" target="_blank" rel="noopener" style="color:var(--acc)">ollama.com/download</a></small>`);
+    if(d.methode_installation==='script'&&!d.root) h+=` <small class="note">(no Linux exige root)</small>`;
+  }
+  if(d.installation&&d.installation.etat==='en_cours') h+=` · ${esc(d.installation.message)}`;
+  el.innerHTML=h;
+  PROV.ollama&&(PROV.ollama.modeles=d.modeles.map(m=>m.nom));
+  ollamaOptions();
+}
+function ollamaOptions(){
+  const sel=$('#ps-ollama'); if(!sel||!OLL) return;
+  const f=($('#pb-ollama')?.value||'').trim().toLowerCase();
+  const atual=OLL.modele_actif||(PROV.ollama&&PROV.ollama.modele)||'';
+  const inst=OLL.modeles.map(m=>m.nom);
+  const ok=n=>!f||n.toLowerCase().includes(f);
+  let h='';
+  const a=inst.filter(ok);
+  if(a.length) h+='<optgroup label="Instalados">'+a.map(n=>`<option value="${esc(n)}"${n===atual?' selected':''}>✓ ${esc(n)}</option>`).join('')+'</optgroup>';
+  const c=(OLL.catalogue||[]).filter(x=>!inst.includes(x.nom)&&ok(x.nom));
+  if(c.length) h+='<optgroup label="Catálogo (baixar)">'+c.map(x=>`<option value="${esc(x.nom)}">⬇ ${esc(x.nom)} — ${x.taille_go} GB · VRAM ~${x.vram} GB</option>`).join('')+'</optgroup>';
+  if(f&&/^[a-z0-9][a-z0-9._:\/-]{0,99}$/.test(f)&&!inst.includes(f)&&!c.some(x=>x.nom===f))
+    h+=`<optgroup label="Outro"><option value="${esc(f)}">⬇ ${esc(f)} (baixar da biblioteca Ollama)</option></optgroup>`;
+  sel.innerHTML=h||'<option value="">— nenhum modelo; digite um nome na busca —</option>';
+}
+async function ollamaGarantir(m){
+  if(!OLL) await ollamaDetectar();
+  if(!OLL.joignable){provMsg('ollama',{ok:false,message:'Ollama não está rodando. Instale ou inicie primeiro.'});return false}
+  if(OLL.modeles.some(x=>x.nom===m))return true;
+  if(!confirm(`O modelo ${m} não está instalado. Deseja instalar agora?`))return false;
+  const r=await post('/api/panneau/ollama/pull',{nom:m});
+  if(!r.ok){provMsg('ollama',r);return false}
+  const pr=$('#oll-prog'),bar=pr&&pr.querySelector('i'); if(pr)pr.style.display='block';
+  for(;;){
+    await sleep(1000);
+    const st=await api('/api/panneau/pull-status?nom='+encodeURIComponent(m));
+    if(bar)bar.style.width=(st.pct||0)+'%';
+    provMsg('ollama',{ok:st.statut!=='erreur',message:`Baixando ${m}: ${st.pct||0}% ${st.message||''}`});
+    if(st.statut==='termine'){if(pr)pr.style.display='none';await ollamaDetectar();return true}
+    if(st.statut==='erreur'){if(pr)pr.style.display='none';return false}
+  }
+}
+async function ollamaInstalar(btn){
+  if(!confirm('Instalar o Ollama neste computador usando o instalador oficial?'))return;
+  btn.disabled=true;
+  const r=await post('/api/panneau/ollama/instalar-programa',{}); provMsg('ollama',r);
+  if(!r.ok){btn.disabled=false;return}
+  for(;;){
+    await sleep(3000);
+    const st=await api('/api/panneau/ollama/instalacao');
+    provMsg('ollama',{ok:st.etat!=='erreur',message:st.message||'Instalando…'});
+    if(st.etat==='ok'||st.etat==='erreur'||st.etat==='inactif')break;
+  }
+  ollamaDetectar();
+}
+async function ollamaIniciar(btn){
+  btn.disabled=true; const r=await post('/api/panneau/ollama/iniciar',{}); provMsg('ollama',r); ollamaDetectar();
 }
 
 /* ---------- ELEVENLABS ---------- */
@@ -716,6 +904,59 @@ async function elTestar(btn){
 async function elSelecionar(ativar){
   const r=await post('/api/panneau/elevenlabs/selecionar',{voz:$('#el-voz').value,modelo:$('#el-modelo').value,ativar});
   const atual=EL.voix; await chargerEleven(); EL.voix=atual; elFiltrar(); elMsg(r);
+}
+
+
+/* ---------- VOZ: ajustes, clonagem, vozes locais ---------- */
+const GRUPOS_AJ={elevenlabs:k=>k.startsWith('elevenlabs.'),local:k=>!k.startsWith('elevenlabs.')};
+function pintarRange(r){const v=r.nextElementSibling; if(v) v.textContent=(+r.value).toFixed(2);}
+$$('input[data-aj]').forEach(r=>r.addEventListener('input',()=>pintarRange(r)));
+async function chargerAjustesVoz(){
+  const d=await api('/api/panneau/voz/ajustes');
+  $$('input[data-aj]').forEach(r=>{const v=d[r.dataset.aj]; r.value=(v===null||v===undefined)?r.dataset.def:v; pintarRange(r);});
+  const b=$('#aj-boost'); if(b) b.checked=!!d['elevenlabs.boost'];
+}
+const fl=(id,r)=>{const el=$('#'+id); if(el) el.innerHTML=`<span style="color:var(--${r.ok?'ok':'ko'})">${esc(r.message||'')}</span>`;};
+async function salvarAjustes(g){
+  const valores={}; $$('input[data-aj]').forEach(r=>{if(GRUPOS_AJ[g](r.dataset.aj)) valores[r.dataset.aj]=+r.value;});
+  if(g==='elevenlabs') valores['elevenlabs.boost']=$('#aj-boost').checked;
+  fl('aj-msg-'+g, await post('/api/panneau/voz/ajustes',{valores}));
+}
+async function restaurarAjustes(g){
+  const valores={}; $$('input[data-aj]').forEach(r=>{if(GRUPOS_AJ[g](r.dataset.aj)) valores[r.dataset.aj]=null;});
+  if(g==='elevenlabs') valores['elevenlabs.boost']=null;
+  fl('aj-msg-'+g, await post('/api/panneau/voz/ajustes',{valores})); chargerAjustesVoz();
+}
+const lerB64=f=>new Promise((ok,ko)=>{const r=new FileReader();r.onload=()=>ok(String(r.result).split(',')[1]);r.onerror=ko;r.readAsDataURL(f);});
+async function clonarVoz(btn){
+  const fs=[...($('#cl-arquivos').files||[])], nome=($('#cl-nome').value||'').trim();
+  if(!nome||!fs.length){fl('cl-msg',{ok:false,message:'Informe o nome e escolha os áudios.'});return}
+  const total=fs.reduce((a,f)=>a+f.size,0); if(total>25*1024*1024){fl('cl-msg',{ok:false,message:'Máximo 25 MB no total.'});return}
+  btn.disabled=true; fl('cl-msg',{ok:true,message:'Enviando amostras e clonando…'});
+  const arquivos=[]; for(const f of fs) arquivos.push({nome:f.name,dados:await lerB64(f)});
+  const r=await post('/api/panneau/voz/clonar',{nome,arquivos,remover_ruido:$('#cl-ruido').checked,usar:$('#cl-usar').checked});
+  btn.disabled=false; fl('cl-msg',r); if(r.ok) chargerEleven();
+}
+async function chargerVozLocal(){
+  const d=await api('/api/panneau/voz/locais');
+  $('#vl-lista').innerHTML=(d.voix||[]).map(v=>`<tr><td>${esc(v.nom)} ${v.active?bYes('ativa'):''} ${v.config_ok?'':bNo('sem .json')}</td>
+    <td>${esc(v.taille_mo)} MB</td><td><div class="row">
+    <button class="act ghost" onclick="piperSel('${esc(v.nom)}',false)">Usar esta voz</button>
+    <button class="act" onclick="piperSel('${esc(v.nom)}',true)">Usar e ativar Piper</button>
+    <button class="act danger" onclick="piperDel('${esc(v.nom)}')">Remover</button></div></td></tr>`).join('')
+    ||'<tr><td colspan="3" class="muted">Nenhuma voz local ainda. Baixe uma do catálogo abaixo.</td></tr>';
+  $('#vl-catalogo').innerHTML=(d.catalogue||[]).map(c=>`<div class="fld"><div class="lab"><b>${esc(c.nom)}</b><small>${esc(c.note)} · ${c.langue==='pt'?'português':'francês'}</small></div>
+    ${c.installe?bYes('baixada'):`<button class="act ghost" onclick="piperBaixar('${esc(c.nom)}',this)">Baixar</button>`}</div>`).join('');
+}
+async function piperSel(nome,ativar){fl('vl-msg',await post('/api/panneau/voz/piper/selecionar',{nome,ativar}));chargerVozLocal();}
+async function piperDel(nome){if(!confirm('Remover a voz '+nome+'?'))return;fl('vl-msg',await post('/api/panneau/voz/piper/remover',{nome}));chargerVozLocal();}
+async function piperBaixar(nome,btn){btn.disabled=true;btn.textContent='Baixando…';const r=await post('/api/panneau/voz/piper/baixar',{nome});fl('vl-msg',r);chargerVozLocal();}
+async function importarPiper(btn){
+  const a=$('#vl-onnx').files[0], j=$('#vl-json').files[0];
+  if(!a||!j){fl('vl-imp-msg',{ok:false,message:'Escolha o .onnx e o .onnx.json.'});return}
+  btn.disabled=true; fl('vl-imp-msg',{ok:true,message:'Enviando…'});
+  const r=await post('/api/panneau/voz/piper/importar',{nome:a.name,onnx:await lerB64(a),json:await lerB64(j)});
+  btn.disabled=false; fl('vl-imp-msg',r); chargerVozLocal();
 }
 
 /* ---------- ACESSO REMOTO ---------- */

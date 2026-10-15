@@ -36,6 +36,11 @@ ollama:                        # mode local : modele de langage local (http://lo
   think: false                 # false = pas de "raisonnement" natif : indispensable pour la latence et les
                                # appels d'outils (sinon tres lent / rendus en texte). Laisse false.
 
+llm:                           # repli (fallback) : si le modele principal echoue, essai dans l'ordre
+  repli_actif: false           # false = comportement d'origine (aucun repli)
+  repli: []                    # ex. ["anthropic:claude-haiku-4-5", "ollama:qwen2.5:7b"] ; en mode local, Ollama seul
+                               # favoris par fournisseur : <fournisseur>.favoris: [...] (panneau, onglet Provedores IA)
+
 # Fournisseurs optionnels (cle + modele saisis dans le panneau, onglet « Provedores IA »).
 # Stockes pour les connecteurs ; le cerveau de Jarvis reste OpenAI, Anthropic ou Ollama.
 gemini:     { cle: "", modele: "" }
@@ -48,12 +53,14 @@ xai:        { cle: "", modele: "" }
 voix_locale: piper             # mode local : "piper" (recommande FR) ou "kokoro"
 
 piper:                         # mode local : voix francaise Piper (voir docs/local.md)
-  modele: ""                   # chemin d'un .onnx ; vide = 1er trouve dans voix/
+  modele: ""                   # chemin d'un .onnx ; vide = 1er trouve dans voix/ (langue de l'assistant d'abord)
+  # vitesse: 1.0  variation: 0.667  variation_duree: 0.8   (onglet « Voz local » du panneau)
 
 kokoro:                        # TTS local alternatif (voix FR unique ; uv add kokoro-onnx)
   modele: ""                   # chemin de kokoro-v1.0.onnx
   voix: ""                     # chemin de voices-v1.0.bin
-  voix_nom: "ff_siwis"         # voix francaise de Kokoro
+  voix_nom: ""                 # vide = ff_siwis (fr) ou pf_dora (pt) selon assistant.langue
+  # vitesse: 1.0
 
 anthropic:                     # fournisseur Claude / Anthropic alternatif
   cle: "sk-ant-..."            # https://console.anthropic.com/ , section API keys
@@ -64,7 +71,9 @@ elevenlabs:                    # facultatif ; sans cle, Jarvis garde la voix Win
   cle: ""                      # https://elevenlabs.io , profil -> API key (commence par sk_)
   voix: ""                     # ID d'une voix (onglet Voices) ; vide = 1re du compte
   modele: "eleven_flash_v2_5"
-  langue: "fr"                 # force la langue (flash/turbo v2.5) : bonne prononciation des accents
+  langue: ""                   # vide = langue de l'assistant (assistant.langue) ; force flash/turbo v2.5
+  # Reglages fins (onglet ElevenLabs du panneau) ; absents = valeurs de la voix :
+  # stabilite: 0.5   similarite: 0.75   style: 0.0   vitesse: 1.0   boost: true
 
 tts:
   moteur: auto                 # auto | elevenlabs | piper | kokoro | windows
@@ -113,6 +122,8 @@ assistant:
   arbitrage_verrou: 4.0        # evite une seconde reponse au meme wake word
   priorite_micro: 1.0          # multiplicateur du micro principal (laisser 1.0 normalement)
   piece_nuit: "chambre"        # piece allumee au demarrage s'il fait nuit ("" pour desactiver)
+  langue: fr                   # fr = francais (defaut) | pt = portugais du Bresil (voix, transcription,
+                               # reponses, confirmations « sim/nao ») ; a la voix : « fale em portugues »
   personnalite: "jarvis_sarcastique"   # jarvis_sarcastique | neutre | concis
                                # (modifiable a la voix : "passe en mode neutre")
   scene_extinction: "off"      # scene lumieres jouee AVANT d'eteindre le PC ("eteins le PC")

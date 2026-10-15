@@ -100,7 +100,16 @@ class ElevenLabsProvider(ProviderTTS):
         # bonne prononciation des accents (e accent, c cedille...) quelle que soit
         # la voix (sinon la langue est auto-detectee et parfois lue en anglais).
         if any(x in self.modele for x in ("flash", "turbo")):
-            charge["language_code"] = reglage("elevenlabs.langue", "fr")
+            from core import langue
+            charge["language_code"] = langue.elevenlabs()
+        # Réglages fins (panneau) : envoyés uniquement s'ils sont définis.
+        try:
+            from core.voix_gestion import voice_settings_eleven
+            reglages_voix = voice_settings_eleven()
+        except Exception:
+            reglages_voix = None
+        if reglages_voix:
+            charge["voice_settings"] = reglages_voix
         corps = json.dumps(charge).encode("utf-8")
         requete = urllib.request.Request(url, data=corps, method="POST", headers={
             "xi-api-key": self.cle, "Content-Type": "application/json",
@@ -136,8 +145,14 @@ class PiperProvider(ProviderTTS):
 
     def _chemin(self):
         if not self.modele:
-            # a defaut, prend le premier .onnx trouve dans voix/
-            trouves = list((_RACINE / "voix").glob("*.onnx"))
+            # a defaut, prend le premier .onnx de voix/, en preferant la langue
+            # configuree (assistant.langue : fr_FR..., pt_BR...).
+            from core import langue
+            trouves = sorted((_RACINE / "voix").glob("*.onnx"))
+            for prefixe in langue.prefixes_piper():
+                for t in trouves:
+                    if t.name.startswith(prefixe):
+                        return t
             return trouves[0] if trouves else None
         p = Path(self.modele)
         return p if p.is_absolute() else (_RACINE / p)
@@ -162,15 +177,30 @@ class PiperProvider(ProviderTTS):
                 self._voix = PiperVoice.load(str(chemin))
 
             # Ancienne API (piper-tts <= 1.2.x) : synthesize_stream_raw() -> PCM brut.
+            try:
+                from core.voix_gestion import params_piper
+                params = params_piper()
+            except Exception:
+                params = {}
             if hasattr(self._voix, "synthesize_stream_raw"):
-                brut = b"".join(self._voix.synthesize_stream_raw(texte))
+                brut = b"".join(self._voix.synthesize_stream_raw(texte, **params))
                 return np.frombuffer(brut, dtype=np.int16), self._voix.config.sample_rate
 
             # Nouvelle API (piper-tts >= 1.3.0, réécriture OHF-Voice/piper1-gpl) :
             # synthesize() renvoie des AudioChunk (int16 + sample_rate). C'est le
             # cas de la version par défaut de requirements.txt (issue NOVON82).
             morceaux, freq = [], None
-            for chunk in self._voix.synthesize(texte):
+            options = {}
+            if params:
+                try:
+                    from piper import SynthesisConfig
+                    options["syn_config"] = SynthesisConfig(
+                        length_scale=params.get("length_scale"),
+                        noise_scale=params.get("noise_scale"),
+                        noise_w_scale=params.get("noise_w"))
+                except Exception:
+                    options = {}
+            for chunk in self._voix.synthesize(texte, **options):
                 octets = getattr(chunk, "audio_int16_bytes", None)
                 if octets is None:                       # repli : tableau float
                     arr = getattr(chunk, "audio_float_array", None)
@@ -199,7 +229,11 @@ class KokoroProvider(ProviderTTS):
     def __init__(self):
         self.modele = reglage("kokoro.modele", "")
         self.voix = reglage("kokoro.voix", "")
-        self.voix_nom = reglage("kokoro.voix_nom", "ff_siwis")
+        from core import langue
+        self.voix_nom = langue.kokoro_voix(reglage("kokoro.voix_nom", ""))
+        self.lang = langue.kokoro()
+        from core.voix_gestion import vitesse_kokoro
+        self.vitesse = vitesse_kokoro()
         self._k = None
 
     def disponible(self):
@@ -218,7 +252,7 @@ class KokoroProvider(ProviderTTS):
         try:
             if self._k is None:
                 self._k = Kokoro(self.modele, self.voix)
-            samples, freq = self._k.create(texte, voice=self.voix_nom, speed=1.0, lang="fr-fr")
+            samples, freq = self._k.create(texte, voice=self.voix_nom, speed=self.vitesse, lang=self.lang)
             audio = (np.asarray(samples) * 32767).astype(np.int16)
             return audio, freq
         except Exception as e:

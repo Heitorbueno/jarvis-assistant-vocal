@@ -1,8 +1,11 @@
 """Accès distant (Tailscale/Cloudflare), fournisseurs d'IA, ElevenLabs et PWA."""
+import contextlib
 import json
+import sys
 import unittest
 from unittest.mock import MagicMock, patch
 
+import requests as REQUESTS
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -30,6 +33,13 @@ class _Config:
         self._f.stop()
         self._p.stop()
         self._dir.cleanup()
+
+
+@contextlib.contextmanager
+def _requests_get(**kw):
+    """Patch requests.get sur le VRAI module (d'autres tests remplacent sys.modules)."""
+    with patch.dict(sys.modules, {"requests": REQUESTS}), patch.object(REQUESTS, "get", **kw) as g:
+        yield g
 
 
 def _app():
@@ -244,7 +254,7 @@ class ProvedoresTest(BaseTest):
 
     def test_tester_liste_les_modeles(self):
         provedores.enregistrer_cle("openai", "sk-proj-abcdefgh")
-        with patch("requests.get", return_value=self._rep(200, {"data": [{"id": "gpt-b"}, {"id": "gpt-a"}]})) as g:
+        with _requests_get(return_value=self._rep(200, {"data": [{"id": "gpt-b"}, {"id": "gpt-a"}]})) as g:
             r = provedores.tester("openai")
         self.assertTrue(r["ok"])
         self.assertEqual(r["modeles"], ["gpt-a", "gpt-b"])
@@ -254,18 +264,18 @@ class ProvedoresTest(BaseTest):
         provedores.enregistrer_cle("gemini", "AIzaFAKEKEY123")
         data = {"models": [{"name": "models/gemini-x", "supportedGenerationMethods": ["generateContent"]},
                            {"name": "models/embed", "supportedGenerationMethods": ["embedContent"]}]}
-        with patch("requests.get", return_value=self._rep(200, data)) as g:
+        with _requests_get(return_value=self._rep(200, data)) as g:
             r = provedores.tester("gemini")
         self.assertEqual(r["modeles"], ["gemini-x"])
         self.assertIn("x-goog-api-key", g.call_args.kwargs["headers"])
         provedores.enregistrer_cle("anthropic", "sk-ant-FAKE1234")
-        with patch("requests.get", return_value=self._rep(200, {"data": [{"id": "claude-x"}]})) as g:
+        with _requests_get(return_value=self._rep(200, {"data": [{"id": "claude-x"}]})) as g:
             r = provedores.tester("anthropic")
         self.assertEqual(g.call_args.kwargs["headers"]["anthropic-version"], "2023-06-01")
 
     def test_erreur_ne_reflete_pas_la_cle(self):
         provedores.enregistrer_cle("openai", "sk-proj-LEAKLEAK99")
-        with patch("requests.get", return_value=self._rep(
+        with _requests_get(return_value=self._rep(
                 401, {"error": {"message": "Incorrect API key provided"}})):
             r = provedores.tester("openai")
         self.assertFalse(r["ok"])
@@ -294,7 +304,7 @@ class ProvedoresTest(BaseTest):
         provedores.elevenlabs_enregistrer_cle("sk_eleven_FAKE5678")
         rv = self._rep(200, {"voices": [{"voice_id": "abc123XYZ", "name": "Ana", "category": "premade"}]})
         rm = self._rep(200, [{"model_id": "eleven_flash_v2_5", "name": "Flash", "can_do_text_to_speech": True}])
-        with patch("requests.get", side_effect=[rv, rm]):
+        with _requests_get(side_effect=[rv, rm]):
             r = provedores.elevenlabs_tester()
         self.assertTrue(r["ok"])
         self.assertEqual(r["voix"][0]["id"], "abc123XYZ")

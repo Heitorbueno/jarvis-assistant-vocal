@@ -9,6 +9,9 @@ HALLUCINATIONS = (
     "amara.org", "sous-titres", "sous titres", "merci d'avoir regarde",
     "abonnez-vous", "abonnez vous", "a la prochaine video",
     "n'oubliez pas de vous abonner", "sous-titrage",
+    # Equivalents portugais (assistant.langue = pt)
+    "legendas pela comunidade", "obrigado por assistir", "obrigada por assistir",
+    "inscreva-se no canal", "inscreva se no canal", "legendado por", "ate o proximo video",
 )
 
 

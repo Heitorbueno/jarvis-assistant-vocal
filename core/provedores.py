@@ -160,10 +160,11 @@ def lister() -> dict:
             if pid in {"openai", "anthropic"} else "",
             "hote": _ollama_hote() if pid == "ollama" else "",
             "actif": pid == actif,
+            "favoris": favoris(pid),
             "modeles": cache.get("modeles", []),
             "teste_a": cache.get("ts", 0),
         })
-    return {"provedores": out, "mode": mode}
+    return {"provedores": out, "mode": mode, "repli": repli_etat()}
 
 
 def enregistrer_cle(pid: str, cle) -> dict:
@@ -350,3 +351,72 @@ def _reinitialiser_voix() -> None:
         tts.reinitialiser()
     except Exception:
         LOG.debug("reinitialisation tts impossible", exc_info=True)
+
+
+# ============================================================ favoris et repli
+
+MAX_FAVORIS = 12
+
+
+def favoris(pid: str) -> list:
+    if pid not in PROVEDORES:
+        return []
+    valeurs = reglage(f"{PROVEDORES[pid]['section']}.favoris", []) or []
+    return [str(v) for v in valeurs if str(v).strip()]
+
+
+def favoris_ajouter(pid: str, modele) -> dict:
+    if pid not in PROVEDORES:
+        return {"ok": False, "message": "Provedor desconhecido."}
+    from core.panneau import _nom_valide
+    modele = str(modele or "").strip()
+    if not _nom_valide(modele):
+        return {"ok": False, "message": "Nome de modelo inválido."}
+    liste = favoris(pid)
+    if modele in liste:
+        return {"ok": True, "message": "Já está nos favoritos.", "favoritos": liste}
+    if len(liste) >= MAX_FAVORIS:
+        return {"ok": False, "message": f"Máximo de {MAX_FAVORIS} favoritos por provedor."}
+    liste.append(modele)
+    definir(f"{PROVEDORES[pid]['section']}.favoris", liste)
+    return {"ok": True, "message": f"{modele} adicionado aos favoritos.", "favoritos": liste}
+
+
+def favoris_retirer(pid: str, modele) -> dict:
+    if pid not in PROVEDORES:
+        return {"ok": False, "message": "Provedor desconhecido."}
+    liste = [m for m in favoris(pid) if m != str(modele or "").strip()]
+    definir(f"{PROVEDORES[pid]['section']}.favoris", liste)
+    return {"ok": True, "message": "Favorito removido.", "favoritos": liste}
+
+
+def repli_etat() -> dict:
+    return {"ativo": bool(reglage("llm.repli_actif", False)),
+            "ordem": [str(e) for e in (reglage("llm.repli", []) or [])]}
+
+
+def repli_definir(ativo=None, ordem=None) -> dict:
+    from core.panneau import _nom_valide
+    if ordem is not None:
+        if not isinstance(ordem, list) or len(ordem) > 8:
+            return {"ok": False, "message": "Lista de fallback inválida (máx. 8)."}
+        propre = []
+        for e in ordem:
+            fournisseur, _, modele = str(e).partition(":")
+            fournisseur = fournisseur.strip().lower()
+            modele = modele.strip()
+            if fournisseur not in {"openai", "anthropic", "ollama"} or (modele and not _nom_valide(modele)):
+                return {"ok": False, "message": f"Entrada inválida: {str(e)[:60]} "
+                        "(use openai:, anthropic: ou ollama:)"}
+            entree = f"{fournisseur}:{modele}"
+            if entree not in propre:
+                propre.append(entree)
+        definir("llm.repli", propre)
+    if ativo is not None:
+        definir("llm.repli_actif", bool(ativo))
+    try:
+        from core import llm
+        llm.reinitialiser()
+    except Exception:
+        pass
+    return {"ok": True, "message": "Fallback salvo; vale na próxima resposta.", **repli_etat()}

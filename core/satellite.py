@@ -135,7 +135,8 @@ def _systeme(piece):
         base += (f" CONTEXTE : ce satellite est dans « {piece} ». Si l'utilisateur "
                  f"parle d'une lumière/pièce SANS préciser laquelle, utilise « {piece} » "
                  "par défaut.")
-    return base
+    from core import langue
+    return base + langue.consigne_systeme()
 
 
 class _Session:
@@ -181,6 +182,7 @@ def _transcrire(pcm_bytes):
     écartés, hallucinations connues (« Sous-titres… Amara.org ») rejetées.
     """
     import numpy as np
+    from core import langue
     from core.hallucinations import est_hallucination
     audio = (np.frombuffer(bytes(pcm_bytes), dtype=np.int16).astype(np.float32) / 32768.0)
     if audio.size < TAUX * 0.3:
@@ -189,7 +191,7 @@ def _transcrire(pcm_bytes):
     if modele is None:
         return ""
     segments, _ = modele.transcribe(
-        audio, language="fr", beam_size=1,
+        audio, language=langue.whisper(), beam_size=1,
         vad_filter=bool(reglage("satellite_lan.detection_voix", True)),
         vad_parameters={"min_silence_duration_ms": 500},
     )
@@ -275,8 +277,9 @@ def _whisper():
 def _tts_pcm(texte):
     """Synthétise `texte` -> (pcm_bytes 16-bit LE mono, frequence_hz) ou (b"", 0)."""
     try:
+        from core import langue
         from core.tts import tts
-        res = tts().synthetiser(texte)
+        res = tts().synthetiser(langue.localiser(texte))
         if not res:
             return b"", 0
         import numpy as np

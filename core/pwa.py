@@ -69,6 +69,7 @@ _FICHIERS = {
     "apple-touch-icon.png": "image/png",
     "favicon.png": "image/png",
     "hors-ligne.html": "text/html; charset=utf-8",
+    "i18n.js": "application/javascript; charset=utf-8",
 }
 
 
@@ -89,9 +90,18 @@ def balises_tete() -> str:
 
 
 def injecter(html: str) -> str:
-    if "manifest.webmanifest" in html:
-        return html
-    return html.replace("</head>", balises_tete() + "</head>", 1)
+    """Ajoute les balises PWA et la traduction d'interface (assistant.langue)."""
+    import re
+    from core import langue
+    code = langue.code()
+    attr = f'lang="{"pt-BR" if code == "pt" else "fr"}" data-langue="{code}"'
+    if re.search(r"<html\b", html):
+        html = re.sub(r"<html\b[^>]*>", f"<html {attr}>", html, count=1)
+    if "manifest.webmanifest" not in html:
+        html = html.replace("</head>", balises_tete() + "</head>", 1)
+    if "/pwa/i18n.js" not in html:
+        html = html.replace("</head>", '<script src="/pwa/i18n.js" defer></script></head>', 1)
+    return html
 
 
 def _hote_permis(request) -> bool:

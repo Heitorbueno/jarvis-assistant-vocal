@@ -332,6 +332,66 @@ class OllamaProvider(ProviderLLM):
                     "correctement. Reessaie en reformulant, ou repasse en mode cloud."))])
 
 
+# --------------------------------------------------------------- repli (fallback)
+
+def _construire(fournisseur, modele):
+    """Provider pour une entree de repli « fournisseur:modele »."""
+    if fournisseur == "openai":
+        return OpenAIProvider(modele or cloud.modele_par_defaut("openai"))
+    if fournisseur == "anthropic":
+        return ClaudeProvider(modele or cloud.modele_par_defaut("anthropic"))
+    if fournisseur == "ollama":
+        p = OllamaProvider()
+        if modele:
+            p.modele = modele
+        return p
+    return None
+
+
+def entrees_repli():
+    """Liste [(fournisseur, modele)] de ``llm.repli`` (format « fournisseur:modele »)."""
+    out = []
+    for e in (reglage("llm.repli", []) or []):
+        fournisseur, _, modele = str(e).partition(":")
+        fournisseur = fournisseur.strip().lower()
+        if fournisseur in {"openai", "anthropic", "ollama"}:
+            out.append((fournisseur, modele.strip()))
+    return out
+
+
+class ProviderAvecRepli(ProviderLLM):
+    """Essaie le provider principal puis, en cas d'ERREUR, les replis dans l'ordre.
+
+    Ne s'active que si ``llm.repli_actif`` est vrai et que ``llm.repli`` liste des
+    entrees : sans cela llm() renvoie le provider d'origine, inchange. En mode
+    local, seuls les replis Ollama sont autorises (rien ne sort du poste)."""
+
+    def __init__(self, principal, replis):
+        self.principal = principal
+        self.replis = replis
+        self.nom = principal.nom
+        self.modele = getattr(principal, "modele", "-")
+
+    def disponible(self):
+        return self.principal.disponible() or any(r.disponible() for r in self.replis)
+
+    def repondre(self, systeme, historique, outils):
+        erreurs = []
+        for p in [self.principal] + self.replis:
+            try:
+                if p is not self.principal and not p.disponible():
+                    continue
+                rep = p.repondre(systeme, historique, outils)
+                if p is not self.principal:
+                    LOG.warning("LLM : repli utilise -> %s %s", p.nom, getattr(p, "modele", ""))
+                return rep
+            except Exception as e:
+                erreurs.append(f"{p.nom}: {type(e).__name__}")
+                LOG.warning("LLM %s %s en echec (%s), essai suivant",
+                            p.nom, getattr(p, "modele", ""), e)
+        raise RuntimeError("tous les modeles ont echoue : " + ", ".join(erreurs))
+
+
 # --------------------------------------------------------------- fabrique
 
 _LLM = None
@@ -355,6 +415,21 @@ def llm():
                 _LLM = OpenAIProvider(cloud.modele(qualite=qualite), qualite=qualite)
             else:
                 _LLM = ClaudeProvider(cloud.modele(qualite=qualite))
+        if reglage("llm.repli_actif", False):
+            replis = []
+            for fournisseur, modele in entrees_repli():
+                if m == "local" and fournisseur != "ollama":
+                    continue                      # le mode local ne sort jamais du poste
+                try:
+                    p = _construire(fournisseur, modele)
+                except Exception:
+                    LOG.exception("repli %s:%s non construit", fournisseur, modele)
+                    p = None
+                if p is not None and not (p.nom == _LLM.nom
+                                          and getattr(p, "modele", "") == getattr(_LLM, "modele", "")):
+                    replis.append(p)
+            if replis:
+                _LLM = ProviderAvecRepli(_LLM, replis)
         LOG.info("provider LLM : %s (mode %s, modele %s)",
                  _LLM.nom, m, getattr(_LLM, "modele", "-"))
     return _LLM

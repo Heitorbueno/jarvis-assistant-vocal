@@ -35,7 +35,7 @@ import openwakeword
 import sounddevice as sd
 from openwakeword.model import Model as WakeModel
 
-from core import config, journal, memoire, personnalite, registre, voix
+from core import config, journal, langue, memoire, personnalite, registre, voix
 from core.confirmation_vocale import NON, TOUJOURS, interpreter_confirmation
 from core.util import nettoyer_reponse_vocale, sans_accents
 from tools.lumieres import allumer_si_nuit, charger_pieces_hue
@@ -136,6 +136,7 @@ SYSTEME_BASE = (
 # Consigne systeme courante (persona + regles + memoire). Passee a chaque appel
 # Claude via le parametre `system`, distinct de la liste des messages.
 SYSTEME_COURANT = SYSTEME_BASE
+_LANGUE_SYSTEME = [None]   # langue de la consigne courante (reconstruite si elle change)
 
 
 def _refaire_systeme(memoire_courante):
@@ -144,7 +145,9 @@ def _refaire_systeme(memoire_courante):
     persona = personnalite.persona(
         config.reglage("assistant.personnalite", personnalite.DEFAUT))
     SYSTEME_COURANT = (persona + "\n\n" + SYSTEME_BASE
-                       + memoire.texte_pour_systeme(memoire_courante))
+                       + memoire.texte_pour_systeme(memoire_courante)
+                       + langue.consigne_systeme())
+    _LANGUE_SYSTEME[0] = langue.code()
 
 
 # ---------------------------------------------------------------- HUD (option)
@@ -332,6 +335,7 @@ def dire(texte, interruptible=True):
         return                                          # la reponse s'affiche, pas de TTS.
     if _INTERRUPTION.is_set():
         return
+    texte = langue.localiser(texte)   # phrases systeme traduites si assistant.langue = pt
     from core.tts import tts
     resultat = tts().synthetiser(texte)
     if interruptible:
@@ -363,7 +367,7 @@ def _dire_sapi(texte):
         "Add-Type -AssemblyName System.Speech; "
         "$s = New-Object System.Speech.Synthesis.SpeechSynthesizer; "
         "$fr = $s.GetInstalledVoices() | "
-        "Where-Object { $_.VoiceInfo.Culture.Name -like 'fr*' } | "
+        "Where-Object { $_.VoiceInfo.Culture.Name -like '" + langue.code() + "*' } | "
         "Select-Object -First 1; "
         "if ($fr) { $s.SelectVoice($fr.VoiceInfo.Name) }; "
         "$s.Rate = 1; "
@@ -582,7 +586,7 @@ def _executer_outils(blocs):
             "content": contenu,
         })
 
-        if nom in ("remember", "forget", "changer_personnalite"):
+        if nom in ("remember", "forget", "changer_personnalite", "changer_langue"):
             _refaire_systeme(memoire.charger())
 
     return resultats
@@ -677,6 +681,8 @@ def repondre(historique):
     les outils a confirmation, prononce l'annonce et renvoie SENTINEL_CONFIRM
     (la suite est geree par traiter, qui capture la reponse oui/non).
     """
+    if _LANGUE_SYSTEME[0] is not None and _LANGUE_SYSTEME[0] != langue.code():
+        _refaire_systeme(memoire.charger())   # langue changee depuis le panneau
     prioritaire = _repondre_route_prioritaire_commune(historique)
     if prioritaire is not None:
         return prioritaire
@@ -852,7 +858,7 @@ def charger_whisper():
 
     try:
         modele = WhisperModel(MODELE_WHISPER, device="cuda", compute_type="float16")
-        modele.transcribe(np.zeros(TAUX, dtype=np.float32), language="fr")
+        modele.transcribe(np.zeros(TAUX, dtype=np.float32), language=langue.whisper())
         print(f"Whisper {MODELE_WHISPER} sur GPU.")
         return modele
     except Exception as e:
@@ -1087,7 +1093,7 @@ def repondre_en_ecoutant(historique, flux, reveil, whisper):
             tampon = []
             blocs_sur = 0
             try:
-                segments, _ = whisper.transcribe(extrait, language="fr", beam_size=1)
+                segments, _ = whisper.transcribe(extrait, language=langue.whisper(), beam_size=1)
                 dit = " ".join(s.text for s in segments).strip()
             except Exception:
                 dit = ""
@@ -1124,7 +1130,7 @@ def _confirmer(interrompu, relancer, whisper, historique, flux):
                           attente_debut=float(config.reglage("assistant.attente_confirmation", 3.0)))
     reponse = ""
     if audio_conf is not None:
-        seg, _ = whisper.transcribe(audio_conf, language="fr", beam_size=5)
+        seg, _ = whisper.transcribe(audio_conf, language=langue.whisper(), beam_size=5)
         reponse = nettoyer(" ".join(s.text for s in seg).strip())
     print(f"  [confirmation] {reponse or '(rien)'}")
 
@@ -1156,7 +1162,7 @@ def _tronquer(historique):
 def traiter(audio, whisper, historique, flux, reveil):
     """Transcrit, repond, parle. Renvoie True si on doit enchainer (relance)."""
     debut_stt = time.monotonic()
-    segments, _ = whisper.transcribe(audio, language="fr", beam_size=5)
+    segments, _ = whisper.transcribe(audio, language=langue.whisper(), beam_size=5)
     question = nettoyer(" ".join(s.text for s in segments).strip())
     LOG.info("latence STT %.3fs", time.monotonic() - debut_stt)
 
@@ -1278,11 +1284,11 @@ def main():
     # Les appels telephoniques reutilisent ce Whisper pour transcrire les reponses.
     from tools.appels import definir_transcripteur
     definir_transcripteur(lambda chemin: " ".join(
-        s.text for s in whisper.transcribe(chemin, language="fr", beam_size=5)[0]).strip())
+        s.text for s in whisper.transcribe(chemin, language=langue.whisper(), beam_size=5)[0]).strip())
     # V2 (conversation temps reel) : transcription d'un tableau audio (16kHz float32).
     from tools.appel_direct import definir_transcripteur_direct
     definir_transcripteur_direct(lambda audio: " ".join(
-        s.text for s in whisper.transcribe(audio, language="fr", beam_size=1)[0]).strip())
+        s.text for s in whisper.transcribe(audio, language=langue.whisper(), beam_size=1)[0]).strip())
 
     charger_pieces_hue()
     allumer_si_nuit()

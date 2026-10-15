@@ -491,6 +491,7 @@ _CLES_REGLABLES = {
     "assistant.personnalite": "str", "assistant.duree_suite": "int",
     "assistant.seuil_reveil": "float", "tts.moteur": "str",
     "elevenlabs.voix": "str", "elevenlabs.modele": "str",
+    "assistant.langue": "str",
 }
 
 
@@ -550,6 +551,7 @@ def _reglages():
         "elevenlabs": _elevenlabs_voix(),
         "entrees": entrees, "sorties": sorties,
         "personnalites": ["jarvis_sarcastique", "neutre", "concis"],
+        "langue": reglage("assistant.langue", "fr"),
     }
 
 
@@ -572,6 +574,14 @@ def _definir_reglage(cle, valeur):
             if not definir_mode(str(valeur), raison="panneau"):
                 return {"ok": False, "message": "Mode invalide."}
             return {"ok": True, "message": f"Mode {valeur} actif immediatement."}
+        if cle == "assistant.langue":
+            if valeur not in {"fr", "pt"}:
+                return {"ok": False, "message": "Langue invalide."}
+            definir(cle, valeur)
+            from core import tts
+            tts.reinitialiser()
+            return {"ok": True, "message": "Idioma salvo. Vale a partir da próxima frase."
+                    if valeur == "pt" else "Langue enregistree. Effet a la prochaine reponse."}
         if cle == "tts.moteur" and valeur not in {
                 "auto", "elevenlabs", "piper", "kokoro", "windows"}:
             return {"ok": False, "message": "Moteur vocal invalide."}
@@ -1102,6 +1112,120 @@ def monter_routes(app):
         d = await _corps(request)
         return provedores.activer(str(d.get("id", "")), d.get("modelo", ""),
                                   str(d.get("perfil", "hybride")))
+
+    # -- favoris et repli (fallback) --
+    @app.post("/api/panneau/provedores/favorito")
+    async def api_favori(request: Request):
+        if (r := garde(request)):
+            return r
+        from core import provedores
+        d = await _corps(request)
+        if d.get("remover"):
+            return provedores.favoris_retirer(str(d.get("id", "")), d.get("modelo"))
+        return provedores.favoris_ajouter(str(d.get("id", "")), d.get("modelo"))
+
+    @app.post("/api/panneau/provedores/fallback")
+    async def api_repli(request: Request):
+        if (r := garde(request)):
+            return r
+        from core import provedores
+        d = await _corps(request)
+        return provedores.repli_definir(d.get("ativo"), d.get("ordem"))
+
+    # -- Ollama : detection automatique, installation du programme, demarrage --
+    @app.get("/api/panneau/ollama/detectar")
+    def api_ollama_detecter(request: Request):
+        if (r := garde(request)):
+            return r
+        from core import ollama_gestion
+        d = ollama_gestion.detecter()
+        noms = {m["nom"] for m in d["modeles"]}
+        d["catalogue"] = [{**c, "installe": c["nom"] in noms} for c in CATALOGUE_LLM]
+        return d
+
+    @app.post("/api/panneau/ollama/instalar-programa")
+    def api_ollama_installer(request: Request):
+        if (r := garde(request)):
+            return r
+        from core import ollama_gestion
+        LOG.warning("installation d'Ollama demandee depuis le panneau (%s)", _mode(request))
+        return ollama_gestion.installer_programme()
+
+    @app.get("/api/panneau/ollama/instalacao")
+    def api_ollama_installation(request: Request):
+        if (r := garde(request)):
+            return r
+        from core import ollama_gestion
+        return ollama_gestion.etat_installation()
+
+    @app.post("/api/panneau/ollama/iniciar")
+    def api_ollama_demarrer(request: Request):
+        if (r := garde(request)):
+            return r
+        from core import ollama_gestion
+        return ollama_gestion.demarrer()
+
+    # -- Voix : reglages fins, clonage ElevenLabs, voix locales Piper --
+    @app.get("/api/panneau/voz/ajustes")
+    def api_voix_reglages(request: Request):
+        if (r := garde(request)):
+            return r
+        from core import voix_gestion
+        return voix_gestion.reglages()
+
+    @app.post("/api/panneau/voz/ajustes")
+    async def api_voix_definir(request: Request):
+        if (r := garde(request)):
+            return r
+        from core import voix_gestion
+        return voix_gestion.definir_reglages((await _corps(request)).get("valores"))
+
+    @app.post("/api/panneau/voz/clonar")
+    async def api_voix_cloner(request: Request):
+        if (r := garde(request)):
+            return r
+        from core import voix_gestion
+        d = await _corps(request)
+        return voix_gestion.cloner_elevenlabs(
+            d.get("nome"), d.get("arquivos"), d.get("descricao", ""),
+            utiliser=bool(d.get("usar", True)), retirer_bruit=bool(d.get("remover_ruido")))
+
+    @app.get("/api/panneau/voz/locais")
+    def api_voix_locales(request: Request):
+        if (r := garde(request)):
+            return r
+        from core import voix_gestion
+        return voix_gestion.voix_locales()
+
+    @app.post("/api/panneau/voz/piper/baixar")
+    async def api_piper_dl(request: Request):
+        if (r := garde(request)):
+            return r
+        from core import voix_gestion
+        return voix_gestion.telecharger_piper((await _corps(request)).get("nome"))
+
+    @app.post("/api/panneau/voz/piper/importar")
+    async def api_piper_import(request: Request):
+        if (r := garde(request)):
+            return r
+        from core import voix_gestion
+        d = await _corps(request)
+        return voix_gestion.importer_piper(d.get("nome"), d.get("onnx"), d.get("json"))
+
+    @app.post("/api/panneau/voz/piper/selecionar")
+    async def api_piper_choix(request: Request):
+        if (r := garde(request)):
+            return r
+        from core import voix_gestion
+        d = await _corps(request)
+        return voix_gestion.choisir_piper(d.get("nome"), bool(d.get("ativar")))
+
+    @app.post("/api/panneau/voz/piper/remover")
+    async def api_piper_suppr(request: Request):
+        if (r := garde(request)):
+            return r
+        from core import voix_gestion
+        return voix_gestion.supprimer_piper((await _corps(request)).get("nome"))
 
     # -- ElevenLabs --
     @app.get("/api/panneau/elevenlabs")
