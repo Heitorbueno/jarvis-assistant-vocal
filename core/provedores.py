@@ -315,9 +315,20 @@ def elevenlabs_tester() -> dict:
         rv = requests.get(f"{_ELEVEN}/voices", headers=entetes, timeout=TIMEOUT)
         if rv.status_code != 200:
             return {"ok": False, "message": _erreur_http(rv)}
-        voix = [{"id": v.get("voice_id", ""), "nom": v.get("name", "Voz"),
-                 "categorie": v.get("category", "")}
-                for v in rv.json().get("voices", []) if v.get("voice_id")]
+        voix = []
+        for v in rv.json().get("voices", []):
+            if not v.get("voice_id"):
+                continue
+            rotulos = v.get("labels") or {}
+            detalhe = " · ".join(str(rotulos[k]) for k in ("gender", "accent", "age", "use_case")
+                                 if rotulos.get(k))
+            categoria = v.get("category", "") or ""
+            voix.append({"id": v["voice_id"], "nom": v.get("name", "Voz"), "categorie": categoria,
+                         # « Minhas vozes » : clonadas, geradas, profissionais e as salvas
+                         # da biblioteca ; o resto são as vozes padrão da ElevenLabs.
+                         "minha": categoria not in ("premade", ""),
+                         "detalhe": detalhe[:80], "previa": v.get("preview_url", "")})
+        voix.sort(key=lambda x: (not x["minha"], x["nom"].lower()))
         modeles = []
         try:
             rm = requests.get(f"{_ELEVEN}/models", headers=entetes, timeout=TIMEOUT)
@@ -338,8 +349,9 @@ def elevenlabs_tester() -> dict:
         panneau._ELEVENLABS_CACHE.update(ts=time.time(), voix=voix, erreur="")
     except Exception:
         pass
+    minhas = sum(1 for v in voix if v["minha"])
     return {"ok": True, "voix": voix, "modeles": modeles,
-            "message": f"Conexão OK ({len(voix)} vozes)."}
+            "message": f"Conexão OK: {minhas} voz(es) sua(s) e {len(voix) - minhas} padrão."}
 
 
 def elevenlabs_choisir(voix=None, modele=None, activer_moteur: bool = False) -> dict:

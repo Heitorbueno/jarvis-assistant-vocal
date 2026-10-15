@@ -92,6 +92,15 @@
   #chatPwa .msgs .ele{margin:6px 0}
   #chatPwa form{display:flex;gap:6px;padding:8px;border-top:1px solid var(--bord)}
   #chatPwa input{flex:1}
+
+  .cfg{display:grid;grid-template-columns:220px 1fr;gap:16px}
+  .cfg-menu{display:flex;flex-direction:column;gap:4px}
+  .cfg-menu button{text-align:left;background:none;border:1px solid transparent;color:var(--dim);border-radius:8px;padding:8px 10px;cursor:pointer;font-size:13px}
+  .cfg-menu button.on{background:var(--card);border-color:var(--bord);color:var(--txt)}
+  .cfg-menu .pt{float:right;font-size:11px}
+  .cfg .fld input.txt{flex:1 1 260px}
+  .tag-rei{font-size:10px;color:var(--warn);margin-left:6px}
+  @media(max-width:760px){.cfg{grid-template-columns:1fr}.cfg-menu{flex-direction:row;overflow-x:auto}.cfg-menu button{white-space:nowrap}}
   .codebox{font:600 20px ui-monospace,Consolas,monospace;letter-spacing:.08em;background:#0b1a12;
     border:1px dashed #1f5a3f;color:#7ee2b0;border-radius:10px;padding:12px;text-align:center;margin-top:10px}
   pre.cmd{background:#0b0d11;border:1px solid var(--bord);border-radius:8px;padding:10px;overflow-x:auto;margin:6px 0}
@@ -116,6 +125,7 @@
   <button data-t="reglages">Réglages</button>
   <button data-t="etat">État</button>
   <button data-t="perms">Permissions</button>
+  <button data-t="configuracoes">Configurações</button>
   <button data-t="provedores">Provedores IA</button>
   <button data-t="eleven">ElevenLabs</button>
   <button data-t="vozlocal">Voz local</button>
@@ -286,6 +296,22 @@
       <tbody id="outils"></tbody></table></div>
   </section>
 
+
+  <section id="configuracoes" class="tab">
+    <div class="cfg">
+      <div class="cfg-menu" id="cfg-menu"></div>
+      <div>
+        <div class="card"><h2 id="cfg-titulo">Configurações</h2>
+          <div class="muted" style="font-size:13px;margin-bottom:6px">Tudo que antes era editado à mão no <span class="mono">config.yaml</span>.
+            Senhas e chaves nunca voltam para a tela: deixe o campo como está para manter a atual.</div>
+          <div id="cfg-campos"></div>
+          <div class="row" style="margin-top:12px"><button class="act" onclick="cfgSalvar(this)">Salvar</button><span id="cfg-testes"></span></div>
+          <div class="msg" id="cfg-msg"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <section id="provedores" class="tab">
     <div class="card"><h2>Provedores de IA</h2>
       <div class="muted" style="font-size:13px;margin-bottom:12px">As chaves ficam somente no <span class="mono">config.yaml</span> deste PC e
@@ -312,14 +338,16 @@
         <h3>Chave de API <span id="el-badge"></span></h3>
         <div class="grid">
           <div class="lin">
-            <input id="el-cle" class="txt" type="password" autocomplete="off" placeholder="Cole a chave da ElevenLabs">
+            <input id="el-cle" class="txt" type="password" autocomplete="off" placeholder="Cole a chave da ElevenLabs (começa com sk_)"
+              onpaste="setTimeout(()=>{if(this.value.trim().length>20)elSalvar()},50)">
             <button class="act" onclick="elSalvar()">Salvar</button>
             <button class="act ghost" onclick="elTestar(this)">Testar conexão</button>
             <button class="act danger" onclick="elRemover()">Remover</button>
           </div>
           <div class="lin">
             <input id="el-busca" class="txt" placeholder="Buscar voz…" oninput="elFiltrar()">
-            <select id="el-voz" class="txt"><option value="">— teste a conexão para listar as vozes —</option></select>
+            <select id="el-voz" class="txt" onchange="elFiltrar()"><option value="">— cole a chave para listar suas vozes —</option></select>
+            <button class="act ghost" id="el-previa" style="display:none" onclick="new Audio(this.dataset.url).play()">▶ Prévia</button>
           </div>
           <div class="lin">
             <select id="el-modelo" class="txt"><option value="">— modelo —</option></select>
@@ -554,6 +582,7 @@ $$('nav button[data-t]').forEach(b=>b.onclick=()=>{
   if(b.dataset.t==='integracoes')chargerMcp();
   if(b.dataset.t==='widgets')chargerWidgetsPainel();
   if(b.dataset.t==='manutencao')chargerManut();
+  if(b.dataset.t==='configuracoes')chargerConfig();
   if(b.dataset.t==='conversa')chargerConversa();
 });
 const fmt=n=>esc((n||0).toLocaleString('fr-FR'));
@@ -1048,13 +1077,20 @@ async function chargerEleven(){
   $('#el-badge').innerHTML=EL.etat.configure?bYes('chave '+EL.etat.cle_masquee):bNo('sem chave');
   if(!EL.etat.configure){EL.voix=[];EL.modeles=[];}
   elFiltrar(); elModelos();
+  // Chave salva e lista ainda vazia : busca as vozes da conta sozinho.
+  if(EL.etat.configure&&!EL.voix.length&&!EL.carregando){EL.carregando=true;await elTestar(null);EL.carregando=false;}
 }
 function elFiltrar(){
   const f=($('#el-busca').value||'').toLowerCase(), atual=EL.etat.voix;
-  const l=EL.voix.filter(v=>!f||(v.nom+' '+v.categorie).toLowerCase().includes(f));
-  let h=l.map(v=>`<option value="${esc(v.id)}"${v.id===atual?' selected':''}>${esc(v.nom)}${v.categorie?' · '+esc(v.categorie):''}</option>`).join('');
+  const l=EL.voix.filter(v=>!f||(v.nom+' '+v.categorie+' '+(v.detalhe||'')).toLowerCase().includes(f));
+  const opt=v=>`<option value="${esc(v.id)}"${v.id===atual?' selected':''}>${esc(v.nom)}${v.detalhe?' — '+esc(v.detalhe):''}${v.categorie&&v.minha?' ['+esc(v.categorie)+']':''}</option>`;
+  const minhas=l.filter(v=>v.minha), padrao=l.filter(v=>!v.minha);
+  let h=(minhas.length?`<optgroup label="Minhas vozes (${minhas.length})">${minhas.map(opt).join('')}</optgroup>`:'')
+       +(padrao.length?`<optgroup label="Vozes padrão da ElevenLabs (${padrao.length})">${padrao.map(opt).join('')}</optgroup>`:'');
   if(atual&&!EL.voix.some(v=>v.id===atual)) h=`<option value="${esc(atual)}" selected>${esc(atual)} (atual)</option>`+h;
-  $('#el-voz').innerHTML=h||'<option value="">— teste a conexão para listar as vozes —</option>';
+  $('#el-voz').innerHTML=h||'<option value="">— cole a chave para listar suas vozes —</option>';
+  const v=EL.voix.find(x=>x.id===$('#el-voz').value), pv=$('#el-previa');
+  if(pv){pv.style.display=v&&v.previa?'':'none'; pv.dataset.url=v&&v.previa||'';}
 }
 function elModelos(){
   const atual=EL.etat.modele;
@@ -1065,12 +1101,13 @@ function elModelos(){
 async function elSalvar(){
   const v=($('#el-cle').value||'').trim(); if(!v){elMsg({ok:false,message:'Cole a chave primeiro.'});return}
   const r=await post('/api/panneau/elevenlabs/chave',{chave:v}); if(r.ok)$('#el-cle').value='';
-  await chargerEleven(); elMsg(r);
+  elMsg(r); if(!r.ok)return;
+  EL.voix=[]; await chargerEleven();       // já puxa as vozes salvas da conta
 }
 async function elRemover(){const r=await post('/api/panneau/elevenlabs/chave',{chave:''});await chargerEleven();elMsg(r);}
 async function elTestar(btn){
-  btn.disabled=true; elMsg({ok:true,message:'Testando…'});
-  const r=await post('/api/panneau/elevenlabs/testar',{}); btn.disabled=false;
+  if(btn)btn.disabled=true; elMsg({ok:true,message:'Buscando suas vozes…'});
+  const r=await post('/api/panneau/elevenlabs/testar',{}); if(btn)btn.disabled=false;
   if(r.ok){EL.voix=r.voix||[];EL.modeles=r.modeles||[];elFiltrar();elModelos();} elMsg(r);
 }
 async function elSelecionar(ativar){
@@ -1158,6 +1195,54 @@ async function asDefinir(ativar){
 
 
 
+
+
+/* ---------- CONFIGURACOES (todas as integracoes) ---------- */
+let CFG={grupos:[]}, CFG_ATUAL='';
+async function chargerConfig(){
+  CFG=await api('/api/panneau/configuracoes'); if(!CFG.grupos)return;
+  if(!CFG_ATUAL) CFG_ATUAL=CFG.grupos[0].id;
+  $('#cfg-menu').innerHTML=CFG.grupos.map(g=>{const conf=g.campos.filter(c=>c.tipo==='arquivo'?c.valor:c.definido).length;
+    return `<button class="${g.id===CFG_ATUAL?'on':''}" onclick="cfgGrupo('${g.id}')">${g.icone} ${esc(g.nome)}<span class="pt muted">${conf}/${g.campos.length}</span></button>`}).join('');
+  cfgDesenhar();
+}
+function cfgGrupo(id){CFG_ATUAL=id;$$('#cfg-menu button').forEach((b,i)=>b.classList.toggle('on',CFG.grupos[i].id===id));cfgDesenhar();fl('cfg-msg',{ok:true,message:''});}
+function cfgCampo(c){
+  const id='cfg_'+c.caminho.replace(/[^a-z0-9]/gi,'_'), rei=c.reinicio?'<span class="tag-rei">reinício</span>':'', loc=c.local&&CFG.modo!=='local';
+  const lab=`<div class="lab"><b>${esc(c.rotulo)}</b>${rei}${c.ajuda?`<small>${esc(c.ajuda)}</small>`:''}</div>`;
+  let inp;
+  if(c.tipo==='bool') inp=`<label><input type="checkbox" id="${id}" data-c="${esc(c.caminho)}" ${c.valor?'checked':''} ${loc?'disabled':''}> ativado</label>`;
+  else if(c.tipo==='select') inp=`<select class="txt" id="${id}" data-c="${esc(c.caminho)}" ${loc?'disabled':''}>${c.opcoes.map(o=>`<option${o===c.valor?' selected':''}>${esc(o)}</option>`).join('')}</select>`;
+  else if(c.tipo==='secret') inp=`<input class="txt" type="password" autocomplete="off" id="${id}" data-c="${esc(c.caminho)}" placeholder="${c.definido?esc(c.valor)+' (definido)':'não definido'}">
+      ${c.definido?`<button class="act danger" type="button" onclick="cfgRemover('${esc(c.caminho)}')">Remover</button>`:''}
+      ${c.caminho==='pont_iphone.token'?`<button class="act ghost" type="button" onclick="cfgToken(this)">Gerar</button>`:''}`;
+  else if(c.tipo==='arquivo') inp=`<span>${c.valor?bYes('arquivo salvo'):bNo('não enviado')}</span><input type="file" accept=".json,application/json" class="txt" onchange="cfgGoogle(this)">`;
+  else inp=`<input class="txt" id="${id}" data-c="${esc(c.caminho)}" value="${esc(c.valor??'')}" ${['int','float','nint','nfloat'].includes(c.tipo)?'inputmode="decimal"':''} ${loc?'disabled title="Só no próprio PC"':''}>`;
+  return `<div class="fld">${lab}${inp}</div>`;
+}
+function cfgDesenhar(){
+  const g=CFG.grupos.find(x=>x.id===CFG_ATUAL); if(!g)return;
+  $('#cfg-titulo').textContent=g.icone+' '+g.nome;
+  $('#cfg-campos').innerHTML=g.campos.map(cfgCampo).join('');
+  $('#cfg-testes').innerHTML=(g.testes||[]).map(t=>`<button class="act ghost" onclick="cfgTestar('${t}',this)">Testar ${esc({hue:'Hue',mail:'Gmail',twilio:'Twilio',discord:'Discord',spotify:'Spotify',hermes:'Hermes',obs:'OBS'}[t]||t)}</button>`).join(' ');
+}
+async function cfgSalvar(btn){
+  const valores={}; const g=CFG.grupos.find(x=>x.id===CFG_ATUAL);
+  for(const c of g.campos){ if(c.tipo==='arquivo')continue; const el=document.querySelector(`[data-c="${c.caminho}"]`); if(!el||el.disabled)continue;
+    if(c.tipo==='bool') valores[c.caminho]=el.checked; else if(c.tipo==='secret'){ if(el.value.trim()) valores[c.caminho]=el.value.trim(); }
+    else valores[c.caminho]=el.value; }
+  btn.disabled=true; const r=await post('/api/panneau/configuracoes',{valores}); btn.disabled=false;
+  if(r.ok&&r.message&&r.message.startsWith('0 '))r.message='Nada mudou.'; fl('cfg-msg',r);
+  if(r.ok){ await chargerConfig(); fl('cfg-msg',r); }
+}
+async function cfgRemover(caminho){ if(!confirm('Remover este valor salvo?'))return;
+  const r=await post('/api/panneau/configuracoes',{valores:{[caminho]:'__remover__'}}); await chargerConfig(); fl('cfg-msg',r);}
+async function cfgTestar(t,btn){ btn.disabled=true; fl('cfg-msg',{ok:true,message:'Testando…'}); const r=await post('/api/panneau/configuracoes/testar',{teste:t}); btn.disabled=false; fl('cfg-msg',r);}
+async function cfgToken(btn){ if(!confirm('Gerar um novo token? O Atalho do iPhone precisará do novo valor.'))return;
+  const r=await post('/api/panneau/configuracoes/token-iphone',{}); if(r.ok){prompt('Copie o token para o Atalho do iPhone:',r.token);} fl('cfg-msg',r); chargerConfig();}
+async function cfgGoogle(inp){ const f=inp.files[0]; if(!f)return;
+  const b64=await new Promise(o=>{const r=new FileReader();r.onload=()=>o(String(r.result).split(',')[1]);r.readAsDataURL(f);});
+  const r=await post('/api/panneau/configuracoes/google-credentials',{conteudo:b64}); fl('cfg-msg',r); if(r.ok)chargerConfig();}
 
 /* ---------- COMANDO DE VOZ + CHAT OCULTO (abre só por voz) ---------- */
 const MIC={rec:null,partes:[],timer:null};

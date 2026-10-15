@@ -1137,6 +1137,42 @@ def monter_routes(app):
         d = await _corps(request)
         return autostart.configurer(bool(d.get("ativar")), str(d.get("modo", "completo")))
 
+    # -- configuracoes (todas as integracoes do config.yaml) --
+    @app.get("/api/panneau/configuracoes")
+    def api_conf(request: Request):
+        if (r := garde(request)):
+            return r
+        from core import configuracoes
+        return {**configuracoes.estado(), "modo": _mode(request)}
+
+    @app.post("/api/panneau/configuracoes")
+    async def api_conf_salvar(request: Request):
+        if (r := garde(request)):
+            return r
+        from core import configuracoes
+        return configuracoes.salvar((await _corps(request)).get("valores"), _mode(request))
+
+    @app.post("/api/panneau/configuracoes/testar")
+    async def api_conf_tester(request: Request):
+        if (r := garde(request)):
+            return r
+        from core import configuracoes
+        return configuracoes.testar(str((await _corps(request)).get("teste", "")))
+
+    @app.post("/api/panneau/configuracoes/token-iphone")
+    def api_conf_token(request: Request):
+        if (r := garde(request, local=True)):
+            return r
+        from core import configuracoes
+        return configuracoes.gerar_token()
+
+    @app.post("/api/panneau/configuracoes/google-credentials")
+    async def api_conf_google(request: Request):
+        if (r := garde(request, local=True)):
+            return r
+        from core import configuracoes
+        return configuracoes.salvar_google_credentials((await _corps(request)).get("conteudo", ""))
+
     # -- comandos de voz / chat oculto pelo painel-PWA (regras de acesso a distancia) --
     @app.post("/api/panneau/comando/voz")
     async def api_cmd_voz(request: Request):

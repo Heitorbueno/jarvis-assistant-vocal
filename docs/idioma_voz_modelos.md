@@ -142,3 +142,24 @@ use a chave que começa com `sk_`, exibida só ao criar/rotacionar.
   Cloudflare). Limite de 20 comandos por minuto.
 - Corrigido: no celular o painel ficava mais largo que a tela (tabelas das abas
   Modelos e Permissões); agora elas rolam dentro do card.
+
+## 10. Configurações (todas as integrações pelo painel)
+
+Painel › **Configurações**: tudo o que antes era editado à mão no `config.yaml`, em
+14 grupos (Assistente, Áudio, Casa inteligente, E-mail e agenda, Telefonia, Redes,
+Música e transmissão, Hermes, Servidor/iPhone, Navegador, HUD/overlay, Orçamento,
+Resumo da manhã, Gestos), com validação e botão **Testar** (Hue, Gmail, Twilio,
+Discord, Spotify, OBS, Hermes — chamadas só de leitura).
+
+- Senhas e tokens nunca voltam à tela (`••••1234`); deixe o campo como está para
+  manter, « Remover » para apagar.
+- Campos vazios ou iguais ao padrão não são gravados (o `config.yaml` fica limpo).
+- Caminhos de executáveis/porta do painel só mudam no próprio PC.
+- Credenciais do Google Agenda: envie o JSON OAuth pelo painel.
+- « Ponte iPhone » tem botão **Gerar** token forte.
+- Itens marcados « reinício » valem depois de reiniciar o Jarvis.
+
+**ElevenLabs**: ao colar a chave (`sk_…`) ela é salva e as vozes da sua conta
+aparecem na hora: primeiro **Minhas vozes** (clonadas, geradas, salvas da biblioteca),
+depois as padrão, com descrição e botão ▶ Prévia. O ID da chave é recusado com
+explicação.
