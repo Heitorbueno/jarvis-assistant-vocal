@@ -1137,6 +1137,68 @@ def monter_routes(app):
         d = await _corps(request)
         return autostart.configurer(bool(d.get("ativar")), str(d.get("modo", "completo")))
 
+    # -- widgets du HUD (« loja ») --
+    def _rafraichir_hud():
+        import sys as _sys
+        h = _sys.modules.get("hud")
+        if h is not None:
+            try:
+                h.recharger_widgets()
+            except Exception:
+                pass
+
+    @app.get("/api/panneau/widgets")
+    def api_widgets(request: Request):
+        if (r := garde(request)):
+            return r
+        from core import widgets
+        return widgets.catalogo()
+
+    @app.post("/api/panneau/widgets/instalar")
+    async def api_widgets_installer(request: Request):
+        if (r := garde(request)):
+            return r
+        from core import widgets
+        d = await _corps(request)
+        res = widgets.instalar(str(d.get("id", "")), d.get("coluna"))
+        _rafraichir_hud()
+        return res
+
+    @app.post("/api/panneau/widgets/remover")
+    async def api_widgets_retirer(request: Request):
+        if (r := garde(request)):
+            return r
+        from core import widgets
+        res = widgets.remover(str((await _corps(request)).get("id", "")))
+        _rafraichir_hud()
+        return res
+
+    @app.post("/api/panneau/widgets/mover")
+    async def api_widgets_mover(request: Request):
+        if (r := garde(request)):
+            return r
+        from core import widgets
+        d = await _corps(request)
+        res = widgets.mover(str(d.get("id", "")), str(d.get("direcao", "")))
+        _rafraichir_hud()
+        return res
+
+    @app.post("/api/panneau/widgets/config")
+    async def api_widgets_config(request: Request):
+        if (r := garde(request)):
+            return r
+        from core import widgets
+        res = widgets.definir_parametros(await _corps(request))
+        _rafraichir_hud()
+        return res
+
+    @app.get("/api/panneau/widgets/previa")
+    def api_widgets_previa(request: Request):
+        if (r := garde(request)):
+            return r
+        from core import widgets
+        return widgets.dados_hud()
+
     # -- integrations MCP (cliente) : configuration LOCALE uniquement (secrets, commandes) --
     @app.get("/api/panneau/mcp")
     def api_mcp(request: Request):

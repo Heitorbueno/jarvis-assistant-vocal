@@ -139,6 +139,11 @@ def outil(nom, detail=""):
     _diffuser(evenement)
 
 
+def recharger_widgets():
+    """Demande aux pages HUD de relire /api/widgets (apres un changement au panneau)."""
+    _diffuser({"t": "widgets"})
+
+
 def chat(visible):
     """Affiche ou masque le chat (historique + saisie) du HUD. Masque par defaut."""
     _ETAT["chat"] = bool(visible)
@@ -377,6 +382,12 @@ class _Poignee(BaseHTTPRequestHandler):
             self._controle_etat()
         elif chemin in ("/", "/hud.html", "/index.html"):
             self._page()
+        elif chemin == "/api/widgets":
+            try:
+                from core import widgets
+                self._json(widgets.dados_hud())
+            except Exception as e:
+                self._json({"visivel": False, "widgets": [], "erro": type(e).__name__})
         elif chemin == "/manifest.webmanifest":
             self._fichier_pwa("manifest")
         elif chemin == "/sw.js":
@@ -608,6 +619,11 @@ def demarrer(ouvrir=True, fenetre="navigateur", ecran=None):
     thread.start()
 
     print(f"HUD sur http://127.0.0.1:{PORT}/")
+    try:
+        from core import widgets
+        widgets.aquecer()
+    except Exception:
+        pass
     if ouvrir:
         ouvrir_fenetre()
     return _SERVEUR

@@ -36,7 +36,7 @@ def _localiser():
     if _LIEU:
         return _LIEU
     # 1) Ville forcée en config (géocodage Open-Meteo, gratuit sans clé).
-    ville_cfg = (reglage("meteo.ville", "") or "").strip()
+    ville_cfg = (reglage("meteo.ville", "") or reglage("widgets.cidade", "") or "").strip()
     if ville_cfg:
         try:
             q = urllib.parse.quote(ville_cfg)
@@ -57,13 +57,28 @@ def _localiser():
             d = json.loads(reponse.read().decode("utf-8"))
         _LIEU.update({"lat": d["lat"], "lon": d["lon"], "ville": d.get("city", "")})
     except Exception:
-        _LIEU.update({"lat": 48.8566, "lon": 2.3522, "ville": "Paris"})   # 3) repli
+        # Plus de repli silencieux sur Paris : sans position, on le dit (et on
+        # reessaiera au prochain appel au lieu de garder une position fausse).
+        raise RuntimeError("localisation indisponible : renseigne meteo.ville ou widgets.cidade")
     return _LIEU
 
 
-def _open_meteo(params):
+def _geocoder(ville):
+    from core import langue
+    q = urllib.parse.quote(ville)
+    url = (f"https://geocoding-api.open-meteo.com/v1/search?name={q}&count=1"
+           f"&language={'pt' if langue.est_pt() else 'fr'}")
+    with urllib.request.urlopen(url, timeout=5) as reponse:
+        res = (json.loads(reponse.read().decode("utf-8")).get("results") or [])
+    if not res:
+        return None
+    r0 = res[0]
+    return {"lat": r0["latitude"], "lon": r0["longitude"], "ville": r0.get("name", ville)}
+
+
+def _open_meteo(params, lieu=None):
     """Interroge Open-Meteo (gratuit, sans cle). Renvoie le JSON ou leve."""
-    lieu = _localiser()
+    lieu = lieu or _localiser()
     url = (f"https://api.open-meteo.com/v1/forecast?"
            f"latitude={lieu['lat']}&longitude={lieu['lon']}&timezone=auto&{params}")
     with urllib.request.urlopen(url, timeout=6) as reponse:
@@ -74,22 +89,36 @@ def _open_meteo(params):
     nom="meteo",
     mcp_expose=True,
     description="Donne la meteo actuelle (temperature, ciel) pour la position de "
-                "l'utilisateur.",
+                "l'utilisateur, ou pour la ville demandee (parametre ville).",
+    parametres={"type": "object", "properties": {"ville": {
+        "type": "string", "description": "Ville demandee ; vide = position de l'utilisateur."}}},
     lent=True,
     phrase_attente="Je regarde la meteo.",
 )
 def meteo(ville: str = "") -> str:
-    """Donne la meteo actuelle du lieu (temperature et ciel)."""
+    """Donne la meteo actuelle du lieu (temperature et ciel). `ville` : lieu demande."""
+    from core import langue
     try:
-        d = _open_meteo("current=temperature_2m,weather_code,wind_speed_10m")
+        lieu = None
+        if str(ville or "").strip():
+            lieu = _geocoder(str(ville).strip())
+            if lieu is None:
+                return (f"Não encontrei a cidade {ville}." if langue.est_pt()
+                        else f"Je ne trouve pas la ville {ville}.")
+        d = _open_meteo("current=temperature_2m,weather_code,wind_speed_10m", lieu)
         actuel = d["current"]
         temp = round(actuel["temperature_2m"])
-        ciel = _CODES_METEO.get(actuel["weather_code"], "temps variable")
         vent = round(actuel.get("wind_speed_10m", 0))
-        lieu = _LIEU.get("ville") or "ta position"
-        return f"A {lieu}, il fait {temp} degres, {ciel}, vent {vent} km/h."
+        nom = (lieu or _LIEU).get("ville") or ("sua região" if langue.est_pt() else "ta position")
+        if langue.est_pt():
+            from core.widgets import _WMO_PT
+            ciel = _WMO_PT.get(actuel["weather_code"], "tempo variável")
+            return f"Em {nom}, {temp} graus, {ciel}, vento de {vent} km/h."
+        ciel = _CODES_METEO.get(actuel["weather_code"], "temps variable")
+        return f"A {nom}, il fait {temp} degres, {ciel}, vent {vent} km/h."
     except Exception as e:
-        return f"Meteo indisponible : {e}"
+        return (f"Previsão do tempo indisponível: {type(e).__name__}" if langue.est_pt()
+                else f"Meteo indisponible : {e}")
 
 
 def il_fait_nuit():

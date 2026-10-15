@@ -516,6 +516,19 @@ alexa:                         # EXPERIMENTAL (via alexapy, non officiel) ; voir
   proxy_port: 3000             # port du proxy de connexion (scripts/alexa_login.py)
   routage_prioritaire: true    # commandes domotiques/routines -> Alexa avant le LLM (false = choix du LLM)
 
+widgets:                       # widgets do HUD (painel > Widgets) ; vazio = nenhum widget (HUD original)
+  instalados: []               # ex. [{id: clima, coluna: direita}, {id: cambio, coluna: direita},
+                               #      {id: bolsa, coluna: direita}, {id: noticias, coluna: esquerda}]
+                               # ids : clima, cambio, bolsa, noticias, youtube, spotify, netflix, primevideo
+  cidade: ""                   # clima ; vazio = meteo.ville, sinon IP
+  moedas: ["USD-BRL", "EUR-BRL", "BTC-BRL"]
+  acoes: ["^BVSP", "PETR4.SA", "VALE3.SA", "ITUB4.SA"]
+  feeds: ["https://g1.globo.com/rss/g1/"]
+  youtube: ""                  # lien video ou playlist
+  spotify: ""                  # lien playlist/album/faixa/podcast
+  brapi_token: ""              # optionnel (bourse via brapi.dev) ; sinon Yahoo Finance
+  visivel: true
+
 meteo:
   ville: ""                     # "" = auto par IP (localisation) ; mets ta ville si l'IP se trompe (ex. "Yerres", "Paris")
 

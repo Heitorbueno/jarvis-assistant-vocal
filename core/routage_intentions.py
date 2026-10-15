@@ -128,6 +128,7 @@ _DOMAINES = (
     (("heure", "date", "minuteur", "chronometre", "alarme", "rappel"),
      {"temps", "notes"}),
     (("meteo", "temperature", "pleut", "pluie", "temps fait"), {"meteo"}),
+    (("dollar", "bourse", "cours", "actualite", "actualites", "widget"), {"widgets_hud"}),
     (("mail", "mails", "email", "emails", "courriel", "gmail"),
      {"mail", "factures", "brief"}),
     (("colis", "paquet", "livraison", "livraisons", "mes commandes", "ma commande"),
@@ -207,6 +208,10 @@ _DOMAINES_PT = (
     (("personalidade", "modo neutro", "modo conciso", "sarcastico"),
      {"personnalite", "modes"}),
     (("chat", "conversa escrita", "digitar"), {"chat_hud"}),
+    (("dolar", "euro", "bitcoin", "cotacao", "cambio", "bolsa", "ibovespa", "acao", "acoes",
+      "petr4", "vale3", "itub4"), {"widgets_hud"}),
+    (("noticia", "noticias", "manchete", "manchetes", "acontecendo"), {"widgets_hud"}),
+    (("widget", "widgets", "limpa a tela"), {"widgets_hud"}),
     (("cheguei", "estou saindo", "voltei para casa"), {"presence", "scenes"}),
 )
 _DOMAINES_COMMUNS = (

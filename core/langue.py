@@ -193,6 +193,8 @@ _EXACTES = {
         "Não consigo falar com o provedor do modelo: verifique a conexão com a internet.",
     "aucune cle api n'est configuree pour ce fournisseur. ajoute-la dans le panneau.":
         "Nenhuma chave de API configurada para este provedor. Adicione no painel.",
+    "je regarde les cotations.": "Vou ver as cotações.",
+    "je regarde les actualites.": "Vou ver as notícias.",
     "test de la voix jarvis. la voix selectionnee est active.":
         "Teste da voz do Jarvis. A voz selecionada está ativa.",
 }

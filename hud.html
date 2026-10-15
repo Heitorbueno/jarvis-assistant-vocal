@@ -42,6 +42,37 @@
     height: min(72vmin, 640px);
   }
 
+
+  /* --- widgets : deux colonnes laterales, JAMAIS sur le reacteur --- */
+  .col-widgets {
+    position: fixed; top: 300px; bottom: 28px; z-index: 4;
+    display: flex; flex-direction: column; gap: 10px; overflow-y: auto;
+    scrollbar-width: none; pointer-events: auto;
+  }
+  .col-widgets::-webkit-scrollbar { display: none; }
+  .col-widgets.esquerda { left: 40px; }
+  .col-widgets.direita { right: 40px; top: 230px; }
+  body.chat-aberto .col-widgets.esquerda { display: none; }
+  body.sem-widgets .col-widgets { display: none; }
+  .wdg {
+    background: rgba(4,10,14,0.62); border: 1px solid rgba(70,140,160,0.22);
+    border-radius: 10px; padding: 10px 12px; font-size: 11.5px; color: var(--texte);
+    flex: 0 0 auto;
+  }
+  .wdg h4 { margin: 0 0 6px; font-size: 9.5px; letter-spacing: 3px; font-weight: 400;
+    text-transform: uppercase; color: var(--texte-faible); display: flex; justify-content: space-between; }
+  .wdg .gr { font-size: 26px; letter-spacing: 1px; color: var(--vous); }
+  .wdg .fx { display: flex; justify-content: space-between; gap: 8px; padding: 2px 0; }
+  .wdg .fraco { color: var(--texte-faible); }
+  .wdg .sobe { color: #3ecf8e; } .wdg .desce { color: #ff7b7b; }
+  .wdg a { color: var(--texte); text-decoration: none; }
+  .wdg a:hover { color: var(--vous); }
+  .wdg .noticia { padding: 4px 0; border-top: 1px solid rgba(70,140,160,0.12); line-height: 1.35; }
+  .wdg iframe { width: 100%; border: 0; border-radius: 8px; display: block; }
+  .wdg .atalho { display: block; text-align: center; padding: 10px; border-radius: 8px;
+    border: 1px solid rgba(111,227,255,0.35); color: var(--vous); letter-spacing: 2px; }
+  .wdg .erro { color: #f5b942; }
+
   /* --- releve d'etat, en haut a gauche --- */
   .releve {
     position: fixed;
@@ -54,7 +85,8 @@
     user-select: none;
   }
   .releve .champ { display: flex; gap: 12px; align-items: center; }
-  .releve .cle { width: 74px; color: var(--texte-faible); }
+  .releve .cle { min-width: 74px; width: auto; flex: 0 0 auto; padding-right: 4px; color: var(--texte-faible); }
+  html[data-langue="pt"] .releve .cle { min-width: 118px; }
   .releve .val { color: var(--texte); }
   .releve .val.actif { color: var(--vous); text-shadow: 0 0 10px rgba(111,227,255,0.5); }
 
@@ -333,6 +365,9 @@
     <div class="heure" id="vHeure">--:--:--</div>
     <div class="date" id="vDate">—</div>
   </div>
+
+  <section class="col-widgets esquerda" id="widgetsEsquerda" aria-label="widgets"></section>
+  <section class="col-widgets direita" id="widgetsDireita" aria-label="widgets"></section>
 
   <button class="controle-bouton" id="ouvrirControle" type="button"
     aria-controls="controleTiroir" aria-expanded="false">⚙ Config</button>
@@ -865,6 +900,9 @@ function appliquer(ev) {
     case "demo":
       $("badgeDemo").style.display = ev.v ? "block" : "none";
       break;
+    case "widgets":
+      chargerWidgets();
+      break;
     case "chat":
       document.body.classList.toggle("chat-aberto", !!ev.v);
       $("chat").setAttribute("aria-hidden", ev.v ? "false" : "true");
@@ -893,6 +931,87 @@ $("formChat").addEventListener("submit", async (e) => {
       champ.placeholder = d.message || "Erreur"; }
   } catch (_) { champ.value = texte; }
 });
+
+
+// ------------------------------------------------------------- widgets (colonnes laterales)
+
+function largeurColonne() {
+  // Espace libre de chaque cote du reacteur, moins une marge : la colonne ne
+  // recouvre jamais le reacteur. Trop etroit -> widgets masques.
+  const r = $("reacteur").getBoundingClientRect();
+  return Math.floor(Math.min(340, (window.innerWidth - r.width) / 2 - 64));
+}
+function ajusterWidgets() {
+  const l = largeurColonne();
+  document.body.classList.toggle("sem-widgets", l < 210 || !WIDGETS_VISIBLES);
+  for (const id of ["widgetsEsquerda", "widgetsDireita"]) $(id).style.width = Math.max(l, 0) + "px";
+}
+let WIDGETS_VISIBLES = true;
+const fmtBRL = (v, d = 2) => v.toLocaleString("pt-BR", {minimumFractionDigits: d, maximumFractionDigits: d});
+const varia = (v) => `<span class="${v >= 0 ? "sobe" : "desce"}">${v >= 0 ? "▲" : "▼"} ${fmtBRL(Math.abs(v))}%</span>`;
+function renderWidget(w) {
+  const d = w.dados || {};
+  let corpo = "";
+  if (!d.ok) corpo = `<div class="erro">${echap(d.erro || "indisponível")}</div>`;
+  else if (w.id === "clima") {
+    corpo = `<div class="fx"><span class="gr">${echap(d.icone)} ${d.temp}°</span>
+      <span class="fraco" style="text-align:right">${echap(d.cidade)}<br>${echap(d.descricao)}</span></div>
+      <div class="fx fraco"><span>sensação ${d.sensacao}°</span><span>${d.min}° / ${d.max}°</span></div>
+      <div class="fx fraco"><span>umidade ${d.umidade ?? "—"}%</span><span>vento ${d.vento} km/h</span></div>
+      ${(d.previsao || []).map(p => `<div class="fx"><span>${echap(new Date(p.data + "T12:00").toLocaleDateString("pt-BR", {weekday: "short"}))}</span>
+        <span>${echap(p.icone)} ${p.min}° / ${p.max}°${p.chuva != null ? ` · ${p.chuva}%` : ""}</span></div>`).join("")}`;
+  } else if (w.id === "cambio") {
+    corpo = d.cotacoes.map(c => `<div class="fx"><span>${echap(c.par.split("-")[0])}</span>
+      <span>R$ ${fmtBRL(c.valor, c.valor > 1000 ? 0 : 2)} ${varia(c.variacao)}</span></div>`).join("");
+  } else if (w.id === "bolsa") {
+    corpo = d.ativos.map(a => `<div class="fx"><span>${echap(a.nome)}</span>
+      <span>${fmtBRL(a.valor, a.simbolo === "^BVSP" ? 0 : 2)} ${varia(a.variacao)}</span></div>`).join("")
+      + `<div class="fraco" style="font-size:9px;margin-top:4px">${echap(d.fonte || "")}</div>`;
+  } else if (w.id === "noticias") {
+    corpo = d.manchetes.slice(0, 6).map(n => `<div class="noticia">${n.link
+      ? `<a href="${echap(n.link)}" target="_blank" rel="noopener noreferrer">${echap(n.titulo)}</a>` : echap(n.titulo)}
+      <div class="fraco" style="font-size:9.5px">${echap(n.fonte || "")}</div></div>`).join("");
+  } else if (w.id === "youtube" || w.id === "spotify") {
+    const alt = w.id === "youtube" ? Math.round(largeurColonne() * 9 / 16) : 152;
+    corpo = `<iframe src="${echap(d.embed)}" height="${alt}" loading="lazy" referrerpolicy="strict-origin-when-cross-origin"
+      allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" allowfullscreen
+      title="${echap(w.nome)}"></iframe>`;
+  } else if (d.url) {
+    corpo = `<a class="atalho" href="${echap(d.url)}" target="_blank" rel="noopener noreferrer">ABRIR ${echap(w.nome.toUpperCase())} ↗</a>`;
+  }
+  const atraso = d.desatualizado ? ` <span class="fraco">(offline)</span>` : "";
+  return `<div class="wdg" data-w="${echap(w.id)}"><h4><span>${echap(w.nome)}</span>${atraso}</h4>${corpo}</div>`;
+}
+let ASSINATURA_MIDIA = "";
+async function chargerWidgets() {
+  try {
+    const rep = await fetch("/api/widgets", {cache: "no-store"});
+    if (!rep.ok) return;
+    const j = await rep.json();
+    WIDGETS_VISIBLES = j.visivel !== false;
+    ajusterWidgets();
+    // Les lecteurs (iframes) ne sont reconstruits que si leur config change : la
+    // video ou la musique en cours ne redemarre pas a chaque rafraichissement.
+    const midia = JSON.stringify(j.widgets.map(w => [w.id, w.coluna, (w.dados || {}).embed || ""]));
+    for (const col of ["esquerda", "direita"]) {
+      const cible = $(col === "esquerda" ? "widgetsEsquerda" : "widgetsDireita");
+      const liste = j.widgets.filter(w => w.coluna === col);
+      if (midia !== ASSINATURA_MIDIA) {
+        cible.innerHTML = liste.map(renderWidget).join("");
+      } else {
+        for (const w of liste) {
+          if (w.tipo !== "dados") continue;
+          const el = cible.querySelector(`[data-w="${w.id}"]`);
+          if (el) el.outerHTML = renderWidget(w);
+        }
+      }
+    }
+    ASSINATURA_MIDIA = midia;
+  } catch (_) { /* HUD hors ligne : on reessaie a la prochaine minute */ }
+}
+window.addEventListener("resize", ajusterWidgets);
+chargerWidgets();
+setInterval(chargerWidgets, 60000);
 
 // ------------------------------------------------------------- connexion SSE
 

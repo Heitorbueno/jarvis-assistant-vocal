@@ -130,7 +130,16 @@ class ElevenLabsProvider(ProviderTTS):
                 pass
             return np.frombuffer(donnees, dtype=np.int16), 24000
         except Exception as e:
-            print(f"  [ElevenLabs] indisponible ({e}), repli voix Windows.")
+            detail = ""
+            try:
+                detail = e.read().decode("utf-8", "ignore")[:300]   # HTTPError : cause precise
+            except Exception:
+                pass
+            if "api_key_id_used_as_api_key" in detail:
+                print("  [ElevenLabs] la cle configuree est l'ID de la cle, pas la cle (sk_...). "
+                      "Corrige-la dans le panneau, onglet ElevenLabs.")
+            else:
+                print(f"  [ElevenLabs] indisponible ({e}) {detail[:160]}, repli voix Windows.")
             return None
 
 

@@ -96,6 +96,7 @@
   <button data-t="provedores">Provedores IA</button>
   <button data-t="eleven">ElevenLabs</button>
   <button data-t="vozlocal">Voz local</button>
+  <button data-t="widgets">Widgets</button>
   <button data-t="integracoes">Integrações</button>
   <button data-t="remoto">Acesso remoto</button>
 </nav>
@@ -365,6 +366,38 @@
   </section>
 
 
+
+  <section id="widgets" class="tab">
+    <div class="card"><h2>Loja de widgets do HUD</h2>
+      <div class="muted" style="font-size:13px;margin-bottom:10px">Instale os widgets e escolha a coluna. Eles ficam nas laterais do HUD e
+        <b>nunca cobrem o reator</b>: se a janela for estreita, somem sozinhos. Também por voz: « esconde os widgets » / « mostra os widgets ».</div>
+      <label><input type="checkbox" id="wg-visivel" onchange="wgConfig({visivel:this.checked})"> widgets visíveis no HUD</label>
+      <div id="wg-loja" style="margin-top:10px"></div>
+      <div class="msg" id="wg-msg"></div>
+    </div>
+    <div class="card"><h2>Configuração</h2>
+      <div class="fld"><div class="lab"><b>Cidade (clima)</b><small>Vazio = pela localização do IP.</small></div>
+        <input id="wg-cidade" class="txt" placeholder="Cuiabá"></div>
+      <div class="fld"><div class="lab"><b>Moedas</b><small>Separadas por vírgula. Ex.: USD-BRL, EUR-BRL, BTC-BRL</small></div>
+        <input id="wg-moedas" class="txt" style="flex:1 1 260px"></div>
+      <div class="fld"><div class="lab"><b>Bolsa</b><small>^BVSP = Ibovespa. Ações: PETR4, VALE3, ITUB4…</small></div>
+        <input id="wg-acoes" class="txt" style="flex:1 1 260px"></div>
+      <div class="fld"><div class="lab"><b>Token brapi.dev</b><small>Opcional; sem token usa Yahoo Finance.</small></div>
+        <input id="wg-brapi" class="txt" type="password" autocomplete="off" placeholder="(opcional)"></div>
+      <div class="fld"><div class="lab"><b>Feeds de notícias (RSS)</b><small>Um por linha (https://).</small></div>
+        <textarea id="wg-feeds" rows="3" style="flex:1 1 300px;background:var(--card2);color:var(--txt);border:1px solid var(--bord);border-radius:8px;padding:8px"></textarea></div>
+      <div class="fld"><div class="lab"><b>YouTube</b><small>Link de vídeo ou playlist.</small></div>
+        <input id="wg-youtube" class="txt" style="flex:1 1 300px" placeholder="https://www.youtube.com/watch?v=…"></div>
+      <div class="fld"><div class="lab"><b>Spotify</b><small>Link de playlist, álbum, faixa ou podcast. Sem login no navegador toca prévia de 30 s.</small></div>
+        <input id="wg-spotify" class="txt" style="flex:1 1 300px" placeholder="https://open.spotify.com/playlist/…"></div>
+      <div class="row" style="margin-top:10px"><button class="act" onclick="wgSalvar()">Salvar configuração</button>
+        <button class="act ghost" onclick="wgPrevia(this)">Testar fontes agora</button></div>
+      <div class="msg" id="wg-cfg-msg"></div>
+      <div id="wg-previa" class="muted mono" style="font-size:12px;margin-top:8px"></div>
+      <small class="note">Netflix e Prime Video não permitem player incorporado (proteção DRM): o widget é um atalho que abre o serviço.</small>
+    </div>
+  </section>
+
   <section id="integracoes" class="tab">
     <div class="card"><h2>Integrações MCP (GitHub, Git, Notion…)</h2>
       <div class="muted" style="font-size:13px;margin-bottom:10px">O Jarvis usa ferramentas de servidores MCP externos, também por voz
@@ -446,6 +479,7 @@ $$('nav button').forEach(b=>b.onclick=()=>{
   if(b.dataset.t==='vozlocal'){chargerVozLocal();chargerAjustesVoz();}
   if(b.dataset.t==='remoto')chargerRemoto();
   if(b.dataset.t==='integracoes')chargerMcp();
+  if(b.dataset.t==='widgets')chargerWidgetsPainel();
 });
 const fmt=n=>esc((n||0).toLocaleString('fr-FR'));
 const eur=n=>'$'+(n||0).toFixed(2);
@@ -1046,6 +1080,41 @@ async function asDefinir(ativar){
   fl('as-msg',await post('/api/panneau/autostart',{ativar,modo:$('#as-modo').value})); chargerAutostart();
 }
 
+
+
+/* ---------- WIDGETS ---------- */
+async function chargerWidgetsPainel(){
+  const d=await api('/api/panneau/widgets'), p=d.parametros||{};
+  $('#wg-visivel').checked=p.visivel!==false;
+  $('#wg-loja').innerHTML=(d.catalogo||[]).map(w=>`<div class="fld"><div class="lab"><b>${esc(w.nome)}</b>
+      <small>${esc(w.descricao)} · fonte: ${esc(w.fonte)}</small></div>
+    <span>${w.instalado?`<select class="txt" style="min-width:0" onchange="wgInstalar('${w.id}',this.value)">
+        <option value="esquerda"${w.coluna_atual==='esquerda'?' selected':''}>coluna esquerda</option>
+        <option value="direita"${w.coluna_atual==='direita'?' selected':''}>coluna direita</option></select>
+      <button class="act ghost" onclick="wgMover('${w.id}','cima')">↑</button><button class="act ghost" onclick="wgMover('${w.id}','baixo')">↓</button>
+      <button class="act danger" onclick="wgRemover('${w.id}')">Remover</button>`
+      :`<button class="act" onclick="wgInstalar('${w.id}')">Instalar</button>`}</span></div>`).join('');
+  $('#wg-cidade').value=p.cidade||''; $('#wg-moedas').value=(p.moedas||[]).join(', ');
+  $('#wg-acoes').value=(p.acoes||[]).map(a=>a.replace('.SA','')).join(', '); $('#wg-feeds').value=(p.feeds||[]).join('\\n');
+  $('#wg-youtube').value=p.youtube||''; $('#wg-spotify').value=p.spotify||'';
+  $('#wg-brapi').placeholder=p.brapi_token_definido?'•••• (definido)':'(opcional)';
+}
+async function wgInstalar(id,coluna){fl('wg-msg',await post('/api/panneau/widgets/instalar',{id,coluna}));chargerWidgetsPainel();}
+async function wgRemover(id){fl('wg-msg',await post('/api/panneau/widgets/remover',{id}));chargerWidgetsPainel();}
+async function wgMover(id,direcao){fl('wg-msg',await post('/api/panneau/widgets/mover',{id,direcao}));chargerWidgetsPainel();}
+async function wgConfig(c){fl('wg-msg',await post('/api/panneau/widgets/config',c));}
+async function wgSalvar(){
+  const sep=v=>v.split(',').map(x=>x.trim()).filter(Boolean);
+  const c={cidade:$('#wg-cidade').value,moedas:sep($('#wg-moedas').value),acoes:sep($('#wg-acoes').value),
+    feeds:$('#wg-feeds').value.split('\\n').map(x=>x.trim()).filter(Boolean),youtube:$('#wg-youtube').value.trim(),spotify:$('#wg-spotify').value.trim()};
+  if($('#wg-brapi').value.trim()) c.brapi_token=$('#wg-brapi').value.trim();
+  const r=await post('/api/panneau/widgets/config',c); fl('wg-cfg-msg',r); if(r.ok){$('#wg-brapi').value='';chargerWidgetsPainel();}
+}
+async function wgPrevia(btn){
+  btn.disabled=true; $('#wg-previa').textContent='Consultando fontes…';
+  const d=await api('/api/panneau/widgets/previa'); btn.disabled=false;
+  $('#wg-previa').innerHTML=(d.widgets||[]).map(w=>`${esc(w.nome)}: ${w.dados&&w.dados.ok?'<span style="color:var(--ok)">OK</span>':'<span style="color:var(--ko)">'+esc((w.dados||{}).erro||'erro')+'</span>'}`).join('<br>')||'Nenhum widget instalado.';
+}
 
 /* ---------- INTEGRACOES MCP ---------- */
 let MCP={servidores:[],modelos:[]};

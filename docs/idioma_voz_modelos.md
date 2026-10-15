@@ -87,3 +87,27 @@ Arquivos) ou informe URL HTTP + cabeçalho de autenticação, ou um comando stdi
   local; adicionar/editar só no próprio PC; tokens nunca voltam ao navegador.
 - O filtro de ferramentas por assunto agora entende português (antes, em pt, muitas
   frases ficavam sem ferramentas).
+
+## 7. Widgets do HUD
+
+Painel › **Widgets** funciona como loja: instalar/remover, coluna (esquerda/direita),
+ordem e configuração. Os widgets ficam em colunas laterais calculadas a partir do
+tamanho do reator: **nunca o cobrem**; em janela estreita somem sozinhos. Com o chat
+aberto, a coluna esquerda dá lugar ao chat.
+
+| Widget | Fonte | Atualização |
+|---|---|---|
+| Clima (agora + 3 dias) | Open-Meteo (gratuito, sem chave) | 10 min |
+| Câmbio (USD, EUR, BTC…) | AwesomeAPI (gratuito, sem chave) | 2 min |
+| Bolsa (Ibovespa, ações) | Yahoo Finance (não oficial) ou brapi.dev com token | 5 min |
+| Notícias | RSS configurável (padrão g1) | 15 min |
+| YouTube / Spotify | players oficiais incorporados | — |
+| Netflix / Prime Video | atalho (os serviços bloqueiam player incorporado/DRM) | — |
+
+Cada fonte tem cache e falha isolada (mostra o último valor como « offline »).
+Por voz: « quanto está o dólar », « como está a bolsa », « quais as notícias »,
+« esconde/mostra os widgets ». Ferramenta de clima corrigida: aceita a cidade pedida,
+responde em português e não cai mais em Paris quando a localização falha.
+
+**ElevenLabs**: o painel recusa o *ID* da chave (erro `api_key_id_used_as_api_key`);
+use a chave que começa com `sk_`, exibida só ao criar/rotacionar.

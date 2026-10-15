@@ -111,7 +111,14 @@ def _erreur_http(r) -> str:
         elif isinstance(err, str):
             message = err
         elif isinstance(data, dict):
-            message = str(data.get("message") or data.get("detail") or "")
+            detail = data.get("detail")
+            if isinstance(detail, dict):           # format ElevenLabs
+                if detail.get("status") == "api_key_id_used_as_api_key":
+                    return ("Essa é o ID da chave, não a chave. Na ElevenLabs, crie ou rotacione "
+                            "a chave e copie o valor que começa com sk_.")
+                message = str(detail.get("message") or detail.get("status") or "")
+            else:
+                message = str(data.get("message") or detail or "")
     except Exception:
         message = ""
     if r.status_code in (401, 403):
@@ -288,6 +295,10 @@ def elevenlabs_enregistrer_cle(cle) -> dict:
     cle = str(cle or "").strip()
     if cle and not cle_valide(cle):
         return {"ok": False, "message": "Formato de chave inválido."}
+    if cle and not cle.startswith("sk_"):
+        return {"ok": False, "message": "Isso parece ser o ID da chave, não a chave. A chave da "
+                "ElevenLabs começa com sk_ e só aparece quando é criada ou rotacionada "
+                "(elevenlabs.io › Developers › API Keys)."}
     definir("elevenlabs.cle", cle)
     _reinitialiser_voix()
     return {"ok": True, "message": "Chave ElevenLabs salva." if cle else "Chave removida.",
