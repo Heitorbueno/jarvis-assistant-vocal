@@ -75,9 +75,6 @@ if errorlevel 1 (
     goto :echec
 )
 
-echo.
-echo Atalhos "Jarvis" e "Jarvis Painel" (Area de Trabalho e Menu Iniciar)...
-powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\criar_atalhos.ps1"
 
 echo.
 echo ============================================================

@@ -170,6 +170,67 @@ _DOMAINES = (
      {"presence", "scenes"}),
 )
 
+# Equivalents portugais (assistant.langue = pt), fusionnes avec _DOMAINES : un
+# domaine reconnu dans l'une ou l'autre langue donne les memes modules.
+_DOMAINES_PT = (
+    (("hora", "horas", "data", "cronometro", "alarme", "despertador", "lembrete", "timer"),
+     {"temps", "notes"}),
+    (("clima", "tempo vai", "previsao", "temperatura", "chuva", "chover"), {"meteo"}),
+    (("email", "emails", "e mail", "e mails", "gmail", "caixa de entrada"),
+     {"mail", "factures", "brief"}),
+    (("encomenda", "pacote", "entrega", "rastreio", "meu pedido"), {"colis", "mail"}),
+    (("agenda", "calendario", "compromisso", "reuniao", "evento", "prazo"),
+     {"agenda", "loopstr", "suivi"}),
+    (("spotify", "playlist", "musica", "cancao", "netflix", "volume", "pausa",
+      "pausar", "proxima", "anterior", "toca", "tocar"),
+     {"spotify", "media", "musique", "audio", "systeme"}),
+    (("luz", "luzes", "lampada", "ar condicionado", "ventilador", "tomada", "alexa",
+      "automacao"), {"lumieres", "amaran", "alexa", "google_home", "modes", "scenes"}),
+    (("tela", "janela", "mouse", "clica", "clique", "computador", " pc ",
+      "aplicativo", "programa", "pasta", "downloads", "configuracao do windows"),
+     {"ecran", "souris", "apps", "systeme", "astra_pc", "gestes", "stats"}),
+    (("chrome", "navegador", "aba", "site", "pagina", "internet", "pesquisa",
+      "pesquise", "procura na web", "reserva"), {"navigateur", "web", "reservation"}),
+    (("roteiro", "gancho", "conteudo", "video", "youtube", "tiktok", "reels",
+      "publicacao", "inspiracao"), {"contenu", "suivi", "deleguer_a_hermes"}),
+    (("hermes", "pesquisa profunda", "analise", "compare", "comparacao", "sintese"),
+     {"deleguer_a_hermes", "web"}),
+    (("ligacao", "liga para", "ligue", "telefone", "telefonar"), {"appels", "appel_direct"}),
+    (("memoria", "lembra", "lembre", "esquece", "esqueca"), {"memoire"}),
+    (("anota", "anote", "nota", "notas", "ideia"), {"notes"}),
+    (("modo hibrido", "modo qualidade", "modo local", "modo nuvem", "idioma",
+      "portugues", "frances", "modelo", "troca para"),
+     {"budget", "modes", "langue", "modeles_ia"}),
+    (("orcamento", "custo", "gasto", "consumo da api"), {"budget"}),
+    (("assinatura", "transacao", "extrato", "financas", "financeiro"),
+     {"finances", "factures"}),
+    (("personalidade", "modo neutro", "modo conciso", "sarcastico"),
+     {"personnalite", "modes"}),
+    (("chat", "conversa escrita", "digitar"), {"chat_hud"}),
+    (("cheguei", "estou saindo", "voltei para casa"), {"presence", "scenes"}),
+)
+_DOMAINES_COMMUNS = (
+    (("github", "repositorio", "repository", "issue", "pull request", " pr ", "commit",
+      "branch", "git", "notion", "integracao", "integration", "mcp"), {"integrations_mcp"}),
+    (("langue", "parle en", "francais", "chat"), {"langue", "chat_hud"}),
+)
+
+_VERBES_ACTION_GENERIQUES_PT = {
+    "abre", "abrir", "ativa", "ativar", "acende", "acender", "apaga", "apagar",
+    "adiciona", "adicionar", "cria", "criar", "desliga", "desligar", "liga", "ligar",
+    "envia", "enviar", "manda", "mandar", "fecha", "fechar", "faz", "fazer", "faca",
+    "inicia", "iniciar", "le", "ler", "leia", "mostra", "mostrar", "mude", "muda",
+    "mudar", "coloca", "colocar", "poe", "programa", "agenda", "agendar", "procura",
+    "procurar", "busca", "buscar", "remove", "remover", "exclui", "excluir", "apague",
+    "verifica", "verificar", "confere", "conferir", "toca", "tocar", "para", "pare",
+    "aumenta", "diminui", "abaixa", "sobe", "baixa", "encontra", "encontrar", "lista",
+    "listar", "qual", "quais", "quanto", "quantos", "como", "onde", "quando",
+}
+_MARQUES_DEMANDE_PT = (
+    "eu quero", "quero", "eu queria", "gostaria", "voce pode", "pode", "consegue",
+    "por favor", "preciso",
+)
+
 _VERBES_ACTION_GENERIQUES = {
     "active", "activer", "affiche", "afficher", "ajoute", "ajouter",
     "baisse", "baisser", "change",
@@ -198,7 +259,7 @@ def modules_pour_phrase(phrase: str) -> set[str] | None:
     ).split())
     enveloppe = f" {normalise} "
     modules = set()
-    for expressions, candidats in _DOMAINES:
+    for expressions, candidats in _DOMAINES + _DOMAINES_PT + _DOMAINES_COMMUNS + _domaines_mcp():
         if any(expr in enveloppe for expr in expressions):
             modules.update(candidats)
     if modules:
@@ -208,10 +269,20 @@ def modules_pour_phrase(phrase: str) -> set[str] | None:
         return modules
 
     mots = set(normalise.split())
-    if mots & _VERBES_ACTION_GENERIQUES:
+    if mots & (_VERBES_ACTION_GENERIQUES | _VERBES_ACTION_GENERIQUES_PT):
         return None
     # « je veux… », « tu peux… » annoncent une demande : mieux vaut tout le catalogue
     # qu'une reponse sans outil qui improvise.
-    if any(f" {marque} " in enveloppe for marque in _MARQUES_DEMANDE):
+    if any(f" {marque} " in enveloppe for marque in _MARQUES_DEMANDE + _MARQUES_DEMANDE_PT):
         return None
     return set()
+
+
+def _domaines_mcp():
+    """Le nom de chaque integration MCP configuree active son domaine."""
+    try:
+        from core.mcp_cliente import serveurs
+        noms = tuple(f" {s['nom'].replace('-', ' ')} " for s in serveurs())
+    except Exception:
+        noms = ()
+    return ((noms, {"integrations_mcp"}),) if noms else ()

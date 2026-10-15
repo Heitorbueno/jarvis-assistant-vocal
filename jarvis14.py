@@ -592,7 +592,7 @@ def _executer_outils(blocs):
             print(f"  [outil] {nom} -> termine")
             _hud("outil", nom, "Action terminee")
             contenu = registre.baliser_externe(nom, str(resultat))
-            if nom in registre.SOURCES_EXTERNES:
+            if nom in registre.SOURCES_EXTERNES or nom in registre.SOURCES_EXTERNES_DYNAMIQUES:
                 _CONTENU_EXTERNE_TOUR[0] = True
 
         resultats.append({
@@ -1287,6 +1287,11 @@ def main():
         and config.reglage("poste_principal.serveur_sans_peripheriques", False))
 
     registre.charger_outils()
+    try:
+        from core import mcp_cliente
+        mcp_cliente.charger_au_demarrage()      # integracoes MCP externas (GitHub, Notion...)
+    except Exception:
+        LOG.exception("integracoes MCP")
     voix.definir_parleur(dire)
     try:
         from tools.alexa import precharger_routines

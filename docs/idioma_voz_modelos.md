@@ -72,3 +72,18 @@ um modelo por provedor, sem fallback, sem ajustes de voz).
 - **"Não consigo falar com o modelo"**: agora o Jarvis diz a causa (chave recusada,
   modelo inexistente, sem crédito, sem rede, chave ausente) e o painel mostra o
   último erro em Provedores IA.
+
+## 6. Integrações MCP (GitHub, Git, Notion…)
+
+Painel › **Integrações**: escolha um modelo pronto (GitHub oficial, Git local, Notion,
+Arquivos) ou informe URL HTTP + cabeçalho de autenticação, ou um comando stdio
+(`uvx`, `npx`). « Salvar e testar » lista as ferramentas do servidor.
+
+- Cada ferramenta vira uma ferramenta do Jarvis (`mcp_<integração>__<ferramenta>`),
+  usável por voz e pelo chat.
+- **Segurança**: por padrão toda ferramenta pede confirmação de voz (N2). Marque
+  apenas leituras como « sem confirmação » (N1). O resultado é tratado como conteúdo
+  externo não confiável; nada é reexposto pelo MCP do Jarvis nem oferecido ao modelo
+  local; adicionar/editar só no próprio PC; tokens nunca voltam ao navegador.
+- O filtro de ferramentas por assunto agora entende português (antes, em pt, muitas
+  frases ficavam sem ferramentas).

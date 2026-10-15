@@ -36,6 +36,15 @@ ollama:                        # mode local : modele de langage local (http://lo
   think: false                 # false = pas de "raisonnement" natif : indispensable pour la latence et les
                                # appels d'outils (sinon tres lent / rendus en texte). Laisse false.
 
+integrations_mcp: []           # integracoes MCP externas (painel > Integracoes) ; ex. :
+  # - nom: github
+  #   url: "https://api.githubcopilot.com/mcp/"
+  #   en_tetes: {Authorization: "Bearer ghp_..."}   # SECRET : reste ici, jamais affiche
+  #   outils_n1: []                                  # lectures sans confirmation ; le reste = N2
+  # - nom: git-local
+  #   commande: "uvx"
+  #   arguments: ["mcp-server-git", "--repository", "C:/projets/x"]
+
 llm:                           # repli (fallback) : si le modele principal echoue, essai dans l'ordre
   repli_actif: false           # false = comportement d'origine (aucun repli)
   repli: []                    # ex. ["anthropic:claude-haiku-4-5", "ollama:qwen2.5:7b"] ; en mode local, Ollama seul

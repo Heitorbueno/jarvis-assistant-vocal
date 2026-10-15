@@ -245,6 +245,9 @@ def main():
     detecter_materiel()
     tester_integrations()
     test_micro_et_bienvenue()
+    if WIN and oui("\nCriar atalhos « Jarvis » e « Jarvis Painel » (Área de Trabalho e Menu Iniciar)?", True):
+        subprocess.run(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File",
+                        str(RACINE / "scripts" / "criar_atalhos.ps1")], check=False)
     if oui("\nIniciar o Jarvis automaticamente quando o computador ligar?", True):
         try:
             from core import autostart

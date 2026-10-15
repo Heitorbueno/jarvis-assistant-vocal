@@ -581,7 +581,7 @@ def traiter_texte(session, phrase):
             faits.append(b.name)
             resultats.append({"type": "tool_result", "tool_use_id": b.id,
                               "content": registre.baliser_externe(b.name, str(res))})
-            if b.name in registre.SOURCES_EXTERNES:
+            if b.name in registre.SOURCES_EXTERNES or b.name in registre.SOURCES_EXTERNES_DYNAMIQUES:
                 contenu_externe = True
         session.historique.append({"role": "user", "content": resultats})
     return {"reponse": "Commande trop longue à traiter.", "attente_confirmation": False}

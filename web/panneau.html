@@ -96,6 +96,7 @@
   <button data-t="provedores">Provedores IA</button>
   <button data-t="eleven">ElevenLabs</button>
   <button data-t="vozlocal">Voz local</button>
+  <button data-t="integracoes">Integrações</button>
   <button data-t="remoto">Acesso remoto</button>
 </nav>
 <main>
@@ -363,6 +364,30 @@
     </div>
   </section>
 
+
+  <section id="integracoes" class="tab">
+    <div class="card"><h2>Integrações MCP (GitHub, Git, Notion…)</h2>
+      <div class="muted" style="font-size:13px;margin-bottom:10px">O Jarvis usa ferramentas de servidores MCP externos, também por voz
+        (« quais issues abertas no GitHub? »). Por segurança, toda ferramenta pede <b>confirmação de voz</b>,
+        exceto as que você marcar como <b>leitura (sem confirmação)</b>. Tokens ficam só no <span class="mono">config.yaml</span>.</div>
+      <div id="mcp-lista"></div>
+    </div>
+    <div class="card"><h2>Adicionar / editar integração</h2>
+      <div id="mcp-bloq" class="lock" style="display:none">Adicionar ou editar integrações só é permitido no próprio PC.</div>
+      <div class="fld"><div class="lab"><b>Modelo pronto</b></div><select id="mcp-modelo" class="txt" onchange="mcpModelo()"></select></div>
+      <div class="fld"><div class="lab"><b>Nome</b><small>minúsculas, ex.: github</small></div><input id="mcp-nome" class="txt"></div>
+      <div class="fld"><div class="lab"><b>URL (HTTP)</b><small>ou deixe vazio e use comando</small></div><input id="mcp-url" class="txt" style="flex:1 1 300px"></div>
+      <div class="fld"><div class="lab"><b>Cabeçalho de autenticação</b><small>Ex.: Authorization = Bearer ghp_…</small></div>
+        <input id="mcp-hk" class="txt" placeholder="Authorization" style="width:150px"><input id="mcp-hv" class="txt" type="password" autocomplete="off" placeholder="Bearer …" style="flex:1 1 240px"></div>
+      <div class="fld"><div class="lab"><b>Comando (stdio)</b><small>Ex.: uvx, npx</small></div><input id="mcp-cmd" class="txt"></div>
+      <div class="fld"><div class="lab"><b>Argumentos</b><small>um por linha</small></div>
+        <textarea id="mcp-args" rows="3" style="flex:1 1 300px;background:var(--card2);color:var(--txt);border:1px solid var(--bord);border-radius:8px;padding:8px"></textarea></div>
+      <div id="mcp-nota" class="muted" style="font-size:12px"></div>
+      <div class="row" style="margin-top:10px"><button class="act" onclick="mcpSalvar(this)">Salvar e testar</button></div>
+      <div class="msg" id="mcp-msg"></div>
+    </div>
+  </section>
+
   <section id="remoto" class="tab">
     <div class="card"><h2>Acesso remoto (Tailscale / Cloudflare / proxy HTTPS)</h2>
       <div id="rem-bloq" class="lock" style="display:none">Esta seção só pode ser alterada no próprio PC (http://127.0.0.1:8790/panneau).</div>
@@ -420,6 +445,7 @@ $$('nav button').forEach(b=>b.onclick=()=>{
   if(b.dataset.t==='eleven'){chargerEleven();chargerAjustesVoz();}
   if(b.dataset.t==='vozlocal'){chargerVozLocal();chargerAjustesVoz();}
   if(b.dataset.t==='remoto')chargerRemoto();
+  if(b.dataset.t==='integracoes')chargerMcp();
 });
 const fmt=n=>esc((n||0).toLocaleString('fr-FR'));
 const eur=n=>'$'+(n||0).toFixed(2);
@@ -1018,6 +1044,56 @@ async function chargerAutostart(){
 async function asDefinir(ativar){
   fl('as-msg',{ok:true,message:'Aplicando…'});
   fl('as-msg',await post('/api/panneau/autostart',{ativar,modo:$('#as-modo').value})); chargerAutostart();
+}
+
+
+/* ---------- INTEGRACOES MCP ---------- */
+let MCP={servidores:[],modelos:[]};
+async function chargerMcp(){
+  MCP=await api('/api/panneau/mcp');
+  $('#mcp-modelo').innerHTML='<option value="">— personalizado —</option>'+(MCP.modelos||[]).map((m,i)=>`<option value="${i}">${esc(m.titulo)}</option>`).join('');
+  $('#mcp-lista').innerHTML=(MCP.servidores||[]).map(s=>`<div class="prov"><h3>${esc(s.nom)} ${s.actif?bYes('ativa'):bNo('inativa')}
+      <span class="badge">${esc(s.type)}</span> ${s.erreur?bNo(s.erreur):''}</h3>
+    <div class="grid"><small class="mono">${esc(s.url||((s.commande||'')+' '+(s.arguments||[]).join(' ')))}</small>
+    ${Object.keys(s.en_tetes||{}).length?`<small class="note">Cabeçalhos: ${Object.entries(s.en_tetes).map(([k,v])=>esc(k)+' '+esc(v)).join(', ')}</small>`:''}
+    <div class="row"><button class="act ghost" onclick="mcpTestar('${esc(s.nom)}',this)">Testar e listar ferramentas</button>
+      <button class="act ghost" onclick="mcpEditar('${esc(s.nom)}')">Editar</button>
+      <button class="act danger" onclick="mcpRemover('${esc(s.nom)}')">Remover</button></div>
+    ${(s.outils||[]).length?`<table><thead><tr><th>Ferramenta</th><th>Leitura (sem confirmação)</th></tr></thead><tbody>
+      ${s.outils.map(o=>`<tr><td><b>${esc(o.nom)}</b><br><small class="muted">${esc(o.description.slice(0,140))}</small></td>
+      <td><input type="checkbox" data-mcp="${esc(s.nom)}" value="${esc(o.nom)}" ${(s.outils_n1||[]).includes(o.nom)?'checked':''}></td></tr>`).join('')}
+      </tbody></table><div class="row"><button class="act" onclick="mcpPermissoes('${esc(s.nom)}')">Salvar permissões</button></div>`:''}
+    <div class="msg" id="mcp-m-${esc(s.nom)}"></div></div></div>`).join('')||'<div class="muted">Nenhuma integração ainda.</div>';
+}
+function mcpModelo(){
+  const m=(MCP.modelos||[])[$('#mcp-modelo').value]; if(!m)return;
+  $('#mcp-nome').value=m.nom; $('#mcp-url').value=m.url||''; $('#mcp-cmd').value=m.commande||'';
+  $('#mcp-args').value=(m.arguments||[]).join('\n'); $('#mcp-nota').textContent=(m.nota||'')+(m.auth?' · '+m.auth:'');
+  if(m.auth){$('#mcp-hk').value=m.auth.split(':')[0];}
+}
+function mcpEditar(n){
+  const s=(MCP.servidores||[]).find(x=>x.nom===n); if(!s)return;
+  $('#mcp-nome').value=s.nom; $('#mcp-url').value=s.url||''; $('#mcp-cmd').value=s.commande||''; $('#mcp-args').value=(s.arguments||[]).join('\n');
+  const h=Object.entries(s.en_tetes||{})[0]; $('#mcp-hk').value=h?h[0]:''; $('#mcp-hv').value=h?h[1]:'';
+}
+async function mcpSalvar(btn){
+  const hk=$('#mcp-hk').value.trim(), hv=$('#mcp-hv').value;
+  const corpo={nom:$('#mcp-nome').value.trim(),url:$('#mcp-url').value.trim(),commande:$('#mcp-cmd').value.trim(),
+    arguments:$('#mcp-args').value.split('\n').map(x=>x.trim()).filter(Boolean),en_tetes:hk?{[hk]:hv}:{}};
+  btn.disabled=true; const r=await post('/api/panneau/mcp/salvar',corpo);
+  if(r.status===403||r.message==='Painel acessível somente localmente.'){$('#mcp-bloq').style.display='';}
+  fl('mcp-msg',r);
+  if(r.ok){$('#mcp-hv').value=''; await chargerMcp(); await mcpTestar(corpo.nom);}
+  btn.disabled=false;
+}
+async function mcpTestar(n,btn){
+  if(btn)btn.disabled=true; const el=$('#mcp-m-'+n); if(el)el.textContent='Conectando…';
+  const r=await post('/api/panneau/mcp/testar',{nome:n}); await chargerMcp(); fl('mcp-m-'+n,r);
+}
+async function mcpRemover(n){if(!confirm('Remover a integração '+n+'?'))return; fl('mcp-msg',await post('/api/panneau/mcp/remover',{nome:n})); chargerMcp();}
+async function mcpPermissoes(n){
+  const leitura=$$(`input[data-mcp="${n}"]`).filter(c=>c.checked).map(c=>c.value);
+  fl('mcp-m-'+n,await post('/api/panneau/mcp/permissoes',{nome:n,leitura}));
 }
 
 /* ---------- ACESSO REMOTO ---------- */

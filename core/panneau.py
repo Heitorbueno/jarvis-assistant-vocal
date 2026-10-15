@@ -1137,6 +1137,43 @@ def monter_routes(app):
         d = await _corps(request)
         return autostart.configurer(bool(d.get("ativar")), str(d.get("modo", "completo")))
 
+    # -- integrations MCP (cliente) : configuration LOCALE uniquement (secrets, commandes) --
+    @app.get("/api/panneau/mcp")
+    def api_mcp(request: Request):
+        if (r := garde(request)):
+            return r
+        from core import mcp_cliente
+        return mcp_cliente.etat_public()
+
+    @app.post("/api/panneau/mcp/salvar")
+    async def api_mcp_salvar(request: Request):
+        if (r := garde(request, local=True)):
+            return r
+        from core import mcp_cliente
+        return mcp_cliente.enregistrer(await _corps(request))
+
+    @app.post("/api/panneau/mcp/remover")
+    async def api_mcp_remover(request: Request):
+        if (r := garde(request, local=True)):
+            return r
+        from core import mcp_cliente
+        return mcp_cliente.supprimer(str((await _corps(request)).get("nome", "")))
+
+    @app.post("/api/panneau/mcp/testar")
+    async def api_mcp_tester(request: Request):
+        if (r := garde(request)):
+            return r
+        from core import mcp_cliente
+        return mcp_cliente.lister_outils(str((await _corps(request)).get("nome", "")))
+
+    @app.post("/api/panneau/mcp/permissoes")
+    async def api_mcp_n1(request: Request):
+        if (r := garde(request, local=True)):
+            return r
+        from core import mcp_cliente
+        d = await _corps(request)
+        return mcp_cliente.definir_n1(str(d.get("nome", "")), d.get("leitura") or [])
+
     # -- favoris et repli (fallback) --
     @app.post("/api/panneau/provedores/favorito")
     async def api_favori(request: Request):
